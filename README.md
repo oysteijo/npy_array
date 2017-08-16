@@ -10,6 +10,9 @@ writing. There is not even methods to set and get elemets of the array.
 The idea is that you can use `cblas` or something similar for the matrix
 operations. I therefore have no intentions of adding such features.
 
+Credit should also go to Just Jordi Castells, and [his blogpost](http://jcastellssala.com/2014/02/01/npy-in-c/),
+which inspired me to write this.
+
 ## The C structure
 The structure is pretty self explanatory.
 
@@ -63,7 +66,7 @@ goes wrong. All errors are written to STDERR. Consider this alpha.
 
 ## TODO
  * Bugfixes
- * Support for `.npz` files (files containg several numpy arrays.)
+ * Support for `.npz` files (files containing several numpy arrays.)
  * Nicer install/make a dynamic library or at least an archive lib.
 
 
