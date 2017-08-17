@@ -5,7 +5,6 @@
 #include <ctype.h>
 #include <assert.h>
 
-#define C_NPY_MAX_DIMENSIONS 8
 #define C_NPY_MAGIC_STRING {0x93,'N','U','M','P','Y'}
 #define C_NPY_MAGIC_LENGTH 6
 #define C_NPY_VERSION_HEADER_LENGTH 4
@@ -26,10 +25,12 @@ typedef struct _cmatrix_t {
     int32_t  ndim;
     char     endianness;
     char     typechar;
-    size_t   itemsize;
+    size_t   elem_size;
     bool     fortran_order;
 } cmatrix_t;
 */
+
+static cmatrix_t * _read_matrix( FILE *fp );
 
 static char *find_header_item( const char *item, const char *header)
 {
@@ -42,7 +43,7 @@ static inline char endianness(){
     return (*(char *)&val == 1) ? '<' : '>';
 }
 
-cmatrix_t * c_npy_read_from_file( const char *filename )
+cmatrix_t * c_npy_matrix_read_file( const char *filename )
 {
     FILE *fp = fopen(filename, "rb");
     if( !fp ){
@@ -50,19 +51,26 @@ cmatrix_t * c_npy_read_from_file( const char *filename )
         perror("Error");
         return NULL;
     }
+	
+	cmatrix_t *m = _read_matrix( fp );
+	if(!m) { fprintf(stderr, "Cannot read matrix.\n"); }
 
+	fclose(fp);
+	return m;
+}
+
+static cmatrix_t * _read_matrix( FILE *fp )
+{
     char fixed_header[C_NPY_PREHEADER_LENGTH + 1];
     size_t chk = fread( fixed_header, sizeof(char), C_NPY_PREHEADER_LENGTH, fp );
     if( chk != C_NPY_PREHEADER_LENGTH ){
         fprintf(stderr, "Cannot read pre header bytes.\n");
-        fclose(fp);
         return NULL;
     }
     for( int i = 0; i < C_NPY_MAGIC_LENGTH; i++ ){
         static char magic[] = C_NPY_MAGIC_STRING;
         if( magic[i] != fixed_header[i] ){
             fprintf(stderr,"File format not recognised as numpy array.\n");
-            fclose(fp);
             return NULL;
         }
     }
@@ -71,7 +79,6 @@ cmatrix_t * c_npy_read_from_file( const char *filename )
 
     if(major_version != 1){
         fprintf(stderr,"Wrong numpy save version. Expected version 1.x This is version %d.%d\n", (int)major_version, (int)minor_version);
-        fclose(fp);
         return NULL;
     }
 
@@ -84,7 +91,6 @@ cmatrix_t * c_npy_read_from_file( const char *filename )
     chk = fread( header, sizeof(char), header_length, fp );
     if( chk != header_length){
         fprintf(stderr, "Cannot read header. %d bytes.\n", header_length);
-        fclose(fp);
         return NULL;
     }
     header[header_length] = '\0';
@@ -95,7 +101,6 @@ cmatrix_t * c_npy_read_from_file( const char *filename )
     cmatrix_t *m = calloc( 1, sizeof *m );
     if ( !m ){
         fprintf(stderr, "Cannot allocate memory dor matrix structure.\n");
-        fclose(fp);
         return NULL;
     }
 
@@ -112,9 +117,9 @@ cmatrix_t * c_npy_read_from_file( const char *filename )
 
     /* FIXME Potential bug: Is the typechar always one byte? */
     m->typechar = descr[1];
-    /* FIXME Potential bug: Is the itemsize always one digit only? */
-    m->itemsize = descr[2] - '0';
-    assert( m->itemsize > 0 );
+    /* FIXME Potential bug: Is the elem_size always one digit only? */
+    m->elem_size = descr[2] - '0';
+    assert( m->elem_size > 0 );
 
 #if VERBOSE
     if(descr[0] == '<') printf("Little Endian\n");
@@ -124,7 +129,7 @@ cmatrix_t * c_npy_read_from_file( const char *filename )
     if(descr[1] == 'f') printf("float number\n");
     if(descr[1] == 'i') printf("integer number\n");
 
-    printf("each item is %d bytes.\n", (int) m->itemsize );
+    printf("each item is %d bytes.\n", (int) m->elem_size );
 #endif
 
     char *fortran = find_header_item("'fortran_order': ", header);
@@ -159,28 +164,25 @@ cmatrix_t * c_npy_read_from_file( const char *filename )
     printf("Number of elements: %llu\n", (unsigned long long) n_elements );
 #endif
 
-    m->data = malloc( n_elements * m->itemsize );
+    m->data = malloc( n_elements * m->elem_size );
     if ( !m->data ){
         fprintf(stderr, "Cannot allocate memory for matrix data.\n");
         free( m );
-        fclose( fp );
         return NULL;
     }
 
-    chk = fread( m->data, m->itemsize, n_elements, fp );
+    chk = fread( m->data, m->elem_size, n_elements, fp );
     if( chk != n_elements){
         fprintf(stderr, "Could not read all data.\n");
         free( m->data );
         free( m );
-        fclose(fp);
         return NULL;
     }
 
-    fclose(fp);
     return m;
 }
 
-void c_npy_dump( const cmatrix_t *m )
+void c_npy_matrix_dump( const cmatrix_t *m )
 {
     if(!m){
         fprintf(stderr, "Warning: No matrix found. (%s)\n", __func__);
@@ -191,12 +193,12 @@ void c_npy_dump( const cmatrix_t *m )
     for( int i = 0; i < m->ndim - 1; i++) printf("%d, ", (int) m->shape[i]);
     printf("%d)\n", (int) m->shape[m->ndim-1]);
     printf("Type         : '%c' ", m->typechar);
-    printf("(%d bytes each element)\n", (int) m->itemsize);
+    printf("(%d bytes each element)\n", (int) m->elem_size);
     printf("Fortran order: %s\n", m->fortran_order ? "True" : "False" );
     return;
 }
 
-void c_npy_write_to_file( const char *filename, const cmatrix_t *m )
+void c_npy_matrix_write_file( const char *filename, const cmatrix_t *m )
 {
     if( !m ){
         fprintf(stderr, "Warning: No matrix found. (%s)\n", __func__);
@@ -233,18 +235,18 @@ void c_npy_write_to_file( const char *filename, const cmatrix_t *m )
     for( int i = 0; i < m->ndim - 1; i++)
         ptr += sprintf(ptr, "%d, ", (int) m->shape[i]);
     ptr += sprintf( ptr, "%d", (int) m->shape[m->ndim-1] );
-    assert( ptr - shape < 512 );
+    assert( ptr - shape < C_NPY_SHAPE_BUFSIZE );
 
     /* Potential bug? There are some additional whitespaces after the dictionaries saved from
      * Python/Numpy. Those are not documented? I have tested that this dictionary actually works */
     size_t len = sprintf(dict, "{'descr': '%c%c%c', 'fortran_order': %s, 'shape': (%s), }",
             m->endianness,
             m->typechar,
-            (char) m->itemsize + '0',
+            (char) m->elem_size + '0',
             m->fortran_order ? "True": "False",
             shape);
 
-    assert( len < 1024 );
+    assert( len < C_NPY_DICT_BUFSIZE );
     uint16_t len_short = (uint16_t) len;
     chk = fwrite( &len_short, sizeof(uint16_t), 1, fp);
     if( chk != 1 ){
@@ -265,7 +267,7 @@ void c_npy_write_to_file( const char *filename, const cmatrix_t *m )
     while ( m->shape[ idx ] > 0 )
         n_elements *= m->shape[ idx++ ];
 
-    chk = fwrite( m->data, m->itemsize, n_elements, fp );
+    chk = fwrite( m->data, m->elem_size, n_elements, fp );
     if( chk != n_elements){
         fprintf(stderr, "Could not write all data.\n");
     }

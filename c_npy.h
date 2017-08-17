@@ -2,8 +2,8 @@
 #define __C_NPY_H__
 
 #include <stdlib.h>
-#include <stdint.h>
 #include <stdbool.h>
+#include <stdint.h>
 
 #define C_NPY_MAX_DIMENSIONS 8
 
@@ -13,13 +13,13 @@ typedef struct _cmatrix_t {
     int32_t  ndim;
     char     endianness;
     char     typechar;
-    size_t   itemsize;
+    size_t   elem_size;
     bool     fortran_order;
 } cmatrix_t;
 
-cmatrix_t * c_npy_read_from_file    ( const char *filename);
-void        c_npy_dump              ( const cmatrix_t *m );
-void        c_npy_write_to_file     ( const char *filename, const cmatrix_t *m );
-void        c_npy_matrix_free       (       cmatrix_t *m );
+cmatrix_t * c_npy_matrix_read_file  ( const char *filename);
+void        c_npy_matrix_dump       ( const cmatrix_t *m );
+void        c_npy_matrix_write_file ( const char *filename, const cmatrix_t *m );
+void        c_npy_matrix_free       ( cmatrix_t *m );
 
 #endif  /* __C_NPY_H__ */

@@ -23,17 +23,17 @@ The structure is pretty self explanatory.
         int32_t  ndim;
         char     endianness;
         char     typechar;
-        size_t   itemsize;
+        size_t   elem_size;
         bool     fortran_order;
     } cmatrix_t;
 
 ## API
 The API is really simple. There is only four functions:
 
-    cmatrix_t * c_npy_read_from_file    ( const char *filename);
-    void        c_npy_dump              ( const cmatrix_t *m );
-    void        c_npy_write_to_file     ( const char *filename, const cmatrix_t *m );
-    void        c_npy_matrix_free       (       cmatrix_t *m );
+    cmatrix_t * c_npy_matrix_read_file  ( const char *filename);
+    void        c_npy_matrix_dump       ( const cmatrix_t *m );
+    void        c_npy_matrix_write_file ( const char *filename, const cmatrix_t *m );
+    void        c_npy_matrix_free       ( cmatrix_t *m );
 
 ## Example usage.
 Here is a really simple example. You can compile this with:
@@ -47,9 +47,9 @@ You can the run example with a numpy file as argument.
     int main(int argc, char *argv[])
     {
         if( argc != 2 ) return -1;
-        cmatrix_t *m = c_npy_read_from_file( argv[1] );
-        c_npy_dump( m );
-        c_npy_write_to_file( "tester_save.npy", m);
+        cmatrix_t *m = c_npy_matrix_read_file( argv[1] );
+        c_npy_matrix_dump( m );
+        c_npy_matrix_write_file( "tester_save.npy", m);
         c_npy_matrix_free( m );
         return 0;
     }
