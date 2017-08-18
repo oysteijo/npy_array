@@ -1,4 +1,5 @@
 #include "c_npy.h"
+#include "zipcontainer.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -43,6 +44,11 @@ static inline char endianness(){
     return (*(char *)&val == 1) ? '<' : '>';
 }
 
+static inline bool is_encypted( uint16_t flag )
+{
+    return flag & (uint16_t) 0x1;
+}
+
 cmatrix_t * c_npy_matrix_read_file( const char *filename )
 {
     FILE *fp = fopen(filename, "rb");
@@ -57,6 +63,144 @@ cmatrix_t * c_npy_matrix_read_file( const char *filename )
 
 	fclose(fp);
 	return m;
+}
+
+#define _MAX_ARRAY_LENGTH 128
+cmatrix_t ** c_npy_matrix_array_read( const char *filename )
+{
+    FILE *fp = fopen(filename, "rb");
+    if( !fp ){
+        fprintf(stderr,"Cannot open '%s' for reading.\n", filename );
+        perror("Error");
+        return NULL;
+    }
+
+    /* FIXME: Check if this is a zipped file */
+
+    cmatrix_t *_array[_MAX_ARRAY_LENGTH] = {NULL};
+    int count = 0;
+
+    while ( true ){
+        char header[LOCAL_HEADER_LENGTH];
+        size_t chk = fread( header, 1, LOCAL_HEADER_LENGTH, fp ); /* FIXME */
+        if (chk != LOCAL_HEADER_LENGTH ){
+            fprintf(stderr, "Cannot read header.\n");
+            break;
+        }
+        if (*(uint32_t*)(header) != 0x04034B50 )
+            break;
+
+        local_file_header_t lh;
+        /* We cannot assume the structure is "packed" we therefore assign one and one element */
+        lh.local_file_header_signature = *(uint32_t*)(header);      /*  4 bytes */    
+        lh.version_needed_to_extract   = *(uint16_t*)(header+4);    /*  2 bytes */    
+        lh.general_purpose_bit_flag    = *(uint16_t*)(header+6);    /*  2 bytes */    
+        lh.compression_method          = *(uint16_t*)(header+8);    /*  2 bytes */
+        lh.last_mod_file_time          = *(uint16_t*)(header+10);   /*  2 bytes */
+        lh.last_mod_file_date          = *(uint16_t*)(header+12);   /*  2 bytes */
+        lh.crc_32                      = *(uint32_t*)(header+14);   /*  4 bytes */
+        lh.compressed_size             = *(uint32_t*)(header+18);   /*  4 bytes */
+        lh.uncompressed_size           = *(uint32_t*)(header+22);   /*  4 bytes */
+        lh.file_name_length            = *(uint16_t*)(header+26);   /*  2 bytes */
+        lh.extra_field_length          = *(uint16_t*)(header+28);   /*  2 bytes */
+
+        char local_file_name[lh.file_name_length+1];
+        lh.file_name = local_file_name;
+        chk = fread( lh.file_name, sizeof(char), lh.file_name_length, fp );
+        if( chk != lh.file_name_length )
+            fprintf(stderr, "Trouble...\n");
+        local_file_name[lh.file_name_length] = '\0';
+        char local_extra_field[lh.extra_field_length+1];
+        lh.extra_field = local_extra_field;
+        chk = fread( lh.extra_field, sizeof(char), lh.extra_field_length, fp );
+        if( chk != lh.extra_field_length )
+            fprintf(stderr, "More trouble...\n");
+        local_extra_field[lh.extra_field_length] = '\0';
+
+        /*  Done reading header... are we ready? */
+#if VERBOSE
+        printf("HEADER: %d\n", count);
+        printf("lh.local_file_header_signature: %d\n", lh.local_file_header_signature);
+        printf("lh.version_needed_to_extract:   %d\n", lh.version_needed_to_extract);
+        printf("lh.general_purpose_bit_flag:    %d\n", lh.general_purpose_bit_flag );
+        printf("lh.compression_method:          %d\n", lh.compression_method);
+        printf("lh.last_mod_file_time:          %d\n", lh.last_mod_file_time);
+        printf("lh.last_mod_file_date:          %d\n", lh.last_mod_file_date);
+        printf("lh.crc_32:                      %d\n", lh.crc_32);
+        printf("lh.compressed_size:             %d\n", lh.compressed_size);
+        printf("lh.uncompressed_size:           %d\n", lh.uncompressed_size);
+        printf("lh.file_name_length:            %d\n", lh.file_name_length);
+        printf("lh.extra_field_length:          %d\n", lh.extra_field_length);
+
+        printf("Filename: %s\n", lh.file_name );
+        printf("Extra field: %s\n", lh.extra_field );
+#endif
+        /* FIXME: Support for compressed files */
+        if( lh.compression_method != 0 ){
+            fprintf(stderr, "local file '%s' is compressed. Skipping.\n", lh.file_name);
+            fprintf(stderr, "Still no support for reading compressed files.\n"
+                    "Please store numpy array with np.savez() instead of np.savez_compressed().\n");
+            continue;
+        }
+
+        /* FIXME: Support for encrypted files */
+        if( is_encypted( lh.general_purpose_bit_flag )) {
+            fprintf(stderr, "local file '%s' is encrypted. Skipping.\n", lh.file_name);
+            continue;
+        }
+
+        if( lh.general_purpose_bit_flag & (uint16_t) 0x4 ){
+            fprintf(stderr, "No support for streamed datafiles with data descriptor.\n");
+            /* fread( ... ); */
+            continue;
+        }
+
+        /* done reading header - read the matrix */
+        if( NULL == (_array[count] = _read_matrix( fp ))){
+            fprintf(stderr, "Cannot read matrix.\n");
+            continue;
+        }
+
+        count++;
+        assert( count < _MAX_ARRAY_LENGTH );
+    }
+
+    /* FIXME: Read all the central directory */
+
+    /* size_t len = c_npy_matrix_array_length( _array ); */
+    size_t len = count;
+    cmatrix_t** retarray = calloc( len, sizeof *retarray);
+    if( !retarray ){
+        fprintf( stderr, "Cannot allocate memory for array of matrices.\n");
+        for( unsigned int i = 0; i < len; i++)
+            c_npy_matrix_free( _array[i] );
+        fclose( fp );
+        return NULL;
+    }
+    /* Copy the pointers */
+    for( unsigned int i = 0; i < len; i++ )
+        retarray[i] = _array[i];
+
+    /* Here we put in a lot of checks! CRC32 among the tests */
+
+    fclose(fp);
+    return retarray;
+}
+
+size_t c_npy_matrix_array_length( cmatrix_t **arr)
+{
+    size_t len = 0;
+    for( len = 0; len < _MAX_ARRAY_LENGTH && arr[len]; len++ )
+        ;
+    return len;
+}
+
+void c_npy_matrix_array_free( cmatrix_t **arr )
+{
+    size_t len = c_npy_matrix_array_length( arr );
+    for( unsigned int i = 0; i < len; i++)
+        c_npy_matrix_free( arr[i] );
+    free( arr );
 }
 
 static cmatrix_t * _read_matrix( FILE *fp )

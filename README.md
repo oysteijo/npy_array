@@ -5,7 +5,7 @@ of Python both compile time and runtime.
 
 This tiny C library can read and write Numpy arrays files (`.npy`) into memory and keep it
 in a C structure. There is no matrix operations available, just reading and
-writing. There is not even methods to set and get elemets of the array.
+writing. There is not even methods to set and get elements of the array.
 
 The idea is that you can use `cblas` or something similar for the matrix
 operations. I therefore have no intentions of adding such features.
@@ -28,13 +28,17 @@ The structure is pretty self explanatory.
     } cmatrix_t;
 
 ## API
-The API is really simple. There is only four functions:
+The API is really simple. There is only seven functions:
 
     cmatrix_t * c_npy_matrix_read_file  ( const char *filename);
     void        c_npy_matrix_dump       ( const cmatrix_t *m );
     void        c_npy_matrix_write_file ( const char *filename, const cmatrix_t *m );
     void        c_npy_matrix_free       ( cmatrix_t *m );
 
+    /* Reading an array of matrices from a .npz file. */
+    cmatrix_t ** c_npy_matrix_array_read  ( const char *filename );
+    size_t       c_npy_matrix_array_length( cmatrix_t **arr);
+    void         c_npy_matrix_array_free  ( cmatrix_t **arr );
 ## Example usage.
 Here is a really simple example. You can compile this with:
 
@@ -67,6 +71,6 @@ goes wrong. All errors are written to STDERR. Consider this alpha.
 ## TODO
  * Bugfixes
  * Support for `.npz` files (files containing several numpy arrays.)
+   **Update:** I just added rudimentary support for reading uncompressed `.npz` files. (No writing yet.)
  * Nicer install/make a dynamic library or at least an archive lib.
-
 
