@@ -17,13 +17,13 @@ typedef struct _cmatrix_t {
     bool     fortran_order;
 } cmatrix_t;
 
-cmatrix_t * c_npy_matrix_read_file  ( const char *filename);
-void        c_npy_matrix_dump       ( const cmatrix_t *m );
-void        c_npy_matrix_write_file ( const char *filename, const cmatrix_t *m );
-void        c_npy_matrix_free       ( cmatrix_t *m );
+cmatrix_t *  c_npy_matrix_read_file   ( const char *filename);
+void         c_npy_matrix_dump        ( const cmatrix_t *m );
+void         c_npy_matrix_write_file  ( const char *filename, const cmatrix_t *m );
+void         c_npy_matrix_free        ( cmatrix_t *m );
 
-cmatrix_t ** c_npy_matrix_array_read( const char *filename );
-size_t c_npy_matrix_array_length( cmatrix_t **arr);
-void c_npy_matrix_array_free( cmatrix_t **arr );
+cmatrix_t ** c_npy_matrix_array_read  ( const char *filename );
+size_t       c_npy_matrix_array_length( cmatrix_t **arr);
+void         c_npy_matrix_array_free  ( cmatrix_t **arr);
 
 #endif  /* __C_NPY_H__ */

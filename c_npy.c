@@ -32,6 +32,8 @@ typedef struct _cmatrix_t {
 */
 
 static cmatrix_t * _read_matrix( FILE *fp );
+static void _read_central_directory_header( FILE *fp, central_directory_header_t *cdh );
+static void _central_directory_header_dump( central_directory_header_t *cdh );
 
 static char *find_header_item( const char *item, const char *header)
 {
@@ -57,12 +59,12 @@ cmatrix_t * c_npy_matrix_read_file( const char *filename )
         perror("Error");
         return NULL;
     }
-	
-	cmatrix_t *m = _read_matrix( fp );
-	if(!m) { fprintf(stderr, "Cannot read matrix.\n"); }
 
-	fclose(fp);
-	return m;
+    cmatrix_t *m = _read_matrix( fp );
+    if(!m) { fprintf(stderr, "Cannot read matrix.\n"); }
+
+    fclose(fp);
+    return m;
 }
 
 #define _MAX_ARRAY_LENGTH 128
@@ -166,9 +168,24 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
     }
 
     /* FIXME: Read all the central directory */
-
+    central_directory_header_t cdh;
+    /* OK reading a local header failed, so we have to go back some bytes */
+    fseek( fp, -LOCAL_HEADER_LENGTH, SEEK_CUR );
+    _read_central_directory_header( fp, &cdh );
+    _central_directory_header_dump( &cdh );
+#if 0
+    free( cdh.file_name );
+    free( cdh.file_comment );
+    free( cdh.extra_field );    
+#endif
     /* size_t len = c_npy_matrix_array_length( _array ); */
     size_t len = count;
+    if( len == 0 ){
+        /* What? Maybe this is not a a zip file */
+        fclose(fp);
+        return NULL;
+    }
+
     cmatrix_t** retarray = calloc( len, sizeof *retarray);
     if( !retarray ){
         fprintf( stderr, "Cannot allocate memory for array of matrices.\n");
@@ -187,8 +204,68 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
     return retarray;
 }
 
+static void _read_central_directory_header( FILE *fp, central_directory_header_t *cdh )
+{
+    /* FIXME: Do checks all reads and malloc. */
+//        chk = fread( lh.file_name, sizeof(char), lh.file_name_length, fp );
+    fread( &cdh->central_file_header_signature, sizeof(char), 4, fp );
+    fread( &cdh->version_made_by, sizeof(char), 2, fp );
+    fread( &cdh->version_needed_to_extract, sizeof(char), 2, fp );
+    fread( &cdh->general_purpose_bit_flag, sizeof(char), 2, fp );
+    fread( &cdh->compression_method, sizeof(char), 2, fp );
+    fread( &cdh->last_mod_file_time, sizeof(char), 2, fp );
+    fread( &cdh->last_mod_file_date, sizeof(char), 2, fp );
+    fread( &cdh->crc_32, sizeof(char), 4, fp );
+    fread( &cdh->compressed_size, sizeof(char), 4, fp );
+    fread( &cdh->uncompressed_size, sizeof(char), 4, fp );
+    fread( &cdh->file_name_length, sizeof(char), 2, fp );
+    fread( &cdh->extra_field_length, sizeof(char), 2, fp );
+    fread( &cdh->file_comment_length, sizeof(char), 2, fp );
+    fread( &cdh->disk_number_start, sizeof(char), 2, fp );
+    fread( &cdh->internal_file_attributes, sizeof(char), 2, fp );
+    fread( &cdh->external_file_attributes, sizeof(char), 4, fp );
+    fread( &cdh->relative_offset_of_local_header, sizeof(char), 4, fp );
+
+    cdh->file_name = calloc( cdh->file_name_length+1, sizeof(char));
+    assert( cdh->file_name);
+    fread( cdh->file_name, sizeof(char), cdh->file_name_length, fp );
+
+    cdh->extra_field = calloc( cdh->extra_field_length+1, sizeof(char));
+    assert( cdh->extra_field);
+    fread( cdh->extra_field, sizeof(char), cdh->extra_field_length, fp );
+
+    cdh->file_comment = calloc( cdh->file_comment_length+1, sizeof(char));
+    assert( cdh->file_comment);
+    fread( cdh->file_comment, sizeof(char), cdh->file_comment_length, fp );
+}
+
+static void _central_directory_header_dump( central_directory_header_t *cdh )
+{
+    printf("(%d) central_file_header_signature\n", cdh->central_file_header_signature);   /* 4 bytes  (0x02014b50) */
+    printf("(%d) version_made_by\n", cdh->version_made_by);                 /* 2 bytes */
+    printf("(%d) version_needed_to_extract\n", cdh->version_needed_to_extract);       /* 2 bytes */
+    printf("(%d) general_purpose_bit_flag\n", cdh->general_purpose_bit_flag);        /* 2 bytes */
+    printf("(%d) compression_method\n", cdh->compression_method);              /* 2 bytes */
+    printf("(%d) last_mod_file_time\n", cdh->last_mod_file_time);              /* 2 bytes */
+    printf("(%d) last_mod_file_date\n", cdh->last_mod_file_date);              /* 2 bytes */
+    printf("(%d) crc_32\n", cdh->crc_32);                          /* 4 bytes */
+    printf("(%d) compressed_size\n", cdh->compressed_size);                 /* 4 bytes */
+    printf("(%d) uncompressed_size\n", cdh->uncompressed_size);               /* 4 bytes */
+    printf("(%d) file_name_length\n", cdh->file_name_length);                /* 2 bytes */
+    printf("(%d) extra_field_length\n", cdh->extra_field_length);              /* 2 bytes */
+    printf("(%d) file_comment_length\n", cdh->file_comment_length);             /* 2 bytes */
+    printf("(%d) disk_number_start\n", cdh->disk_number_start);               /* 2 bytes */
+    printf("(%d) internal_file_attributes\n", cdh->internal_file_attributes);        /* 2 bytes */
+    printf("(%d) external_file_attributes\n", cdh->external_file_attributes);        /* 4 bytes */
+    printf("(%d) relative_offset_of_local_header\n", cdh->relative_offset_of_local_header); /* 4 bytes */
+
+    printf("Filename: %s\n", cdh->file_name );
+    printf("Filecomment: %s\n", cdh->file_comment );
+}
+
 size_t c_npy_matrix_array_length( cmatrix_t **arr)
 {
+    if (!arr) return 0;
     size_t len = 0;
     for( len = 0; len < _MAX_ARRAY_LENGTH && arr[len]; len++ )
         ;
