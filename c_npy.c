@@ -32,6 +32,8 @@ typedef struct _cmatrix_t {
 */
 
 static cmatrix_t * _read_matrix( FILE *fp );
+static void _read_end_of_central_dir( FILE *fp, end_of_central_dir_t *eocd );
+static void end_of_central_dir_dump( end_of_central_dir_t *eocd );
 static void _read_central_directory_header( FILE *fp, central_directory_header_t *cdh );
 static void _central_directory_header_dump( central_directory_header_t *cdh );
 
@@ -171,13 +173,20 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
     central_directory_header_t cdh;
     /* OK reading a local header failed, so we have to go back some bytes */
     fseek( fp, -LOCAL_HEADER_LENGTH, SEEK_CUR );
-    _read_central_directory_header( fp, &cdh );
-    _central_directory_header_dump( &cdh );
-#if 0
-    free( cdh.file_name );
-    free( cdh.file_comment );
-    free( cdh.extra_field );    
+    for (int i = 0;  i < count; i++ ){
+        _read_central_directory_header( fp, &cdh );
+        printf("=== Central directory header %d ===\n", i);
+        _central_directory_header_dump( &cdh );
+#if 1
+        free( cdh.file_name );
+        free( cdh.file_comment );
+        free( cdh.extra_field );    
 #endif
+    }
+    end_of_central_dir_t eocd = {0};
+    _read_end_of_central_dir( fp, &eocd );
+    end_of_central_dir_dump( &eocd );
+
     /* size_t len = c_npy_matrix_array_length( _array ); */
     size_t len = count;
     if( len == 0 ){
@@ -204,27 +213,76 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
     return retarray;
 }
 
+static void _read_end_of_central_dir( FILE *fp, end_of_central_dir_t *eocd )
+{
+    /* FIXME: Do checks all reads and malloc. */
+    char buffer[END_OF_CENTRAL_DIR_LENGTH];
+    size_t chk = fread( buffer, 1, END_OF_CENTRAL_DIR_LENGTH, fp ); /* FIXME */
+    if (chk != END_OF_CENTRAL_DIR_LENGTH ){
+        fprintf(stderr, "Cannot read buffer.\n");
+        return;
+    }
+
+    if (*(uint32_t*)(buffer) != 0x06054b50 ) /* Whoops! */
+        return;
+
+    eocd->end_of_central_dir_signature   = *(uint32_t*)(buffer);     /*  4 bytes (0x06054b50) */
+    eocd->number_of_this_disk            = *(uint16_t*)(buffer+4);   /*  2 bytes */
+    eocd->number_of_the_disk_start_of_cd = *(uint16_t*)(buffer+6);   /*  2 bytes */ 
+    eocd->total_num_entries_this_disk    = *(uint16_t*)(buffer+8);    /*  2 bytes */
+    eocd->total_num_entries_cd           = *(uint16_t*)(buffer+10);  /*  2 bytes */
+    eocd->size_of_cd                     = *(uint32_t*)(buffer+12);  /*  4 bytes */
+    eocd->offset_cd_wrt_disknum          = *(uint32_t*)(buffer+16);  /*  4 bytes */
+    eocd->ZIP_file_comment_length        = *(uint16_t*)(buffer+20);  /*  2 bytes */
+
+    eocd->ZIP_file_comment = calloc( eocd->ZIP_file_comment_length+1, sizeof(char));
+    assert( eocd->ZIP_file_comment);
+    fread( eocd->ZIP_file_comment, sizeof(char), eocd->ZIP_file_comment_length, fp );
+
+}
+
+static void end_of_central_dir_dump( end_of_central_dir_t *eocd )
+{
+    printf("(%d) end_of_central_dir_signature\n",   eocd->end_of_central_dir_signature);
+    printf("(%d) number_of_this_disk\n",            eocd->number_of_this_disk);
+    printf("(%d) number_of_the_disk_start_of_cd\n", eocd->number_of_the_disk_start_of_cd);
+    printf("(%d) total_num_entries_this_disk\n",    eocd->total_num_entries_this_disk);
+    printf("(%d) total_num_entries_cd\n",           eocd->total_num_entries_cd);
+    printf("(%d) size_of_cd\n",                     eocd->size_of_cd);
+    printf("(%d) offset_cd_wrt_disknum\n",          eocd->offset_cd_wrt_disknum);
+    printf("(%d) ZIP_file_comment_length\n",        eocd->ZIP_file_comment_length);
+}
+
 static void _read_central_directory_header( FILE *fp, central_directory_header_t *cdh )
 {
     /* FIXME: Do checks all reads and malloc. */
-//        chk = fread( lh.file_name, sizeof(char), lh.file_name_length, fp );
-    fread( &cdh->central_file_header_signature, sizeof(char), 4, fp );
-    fread( &cdh->version_made_by, sizeof(char), 2, fp );
-    fread( &cdh->version_needed_to_extract, sizeof(char), 2, fp );
-    fread( &cdh->general_purpose_bit_flag, sizeof(char), 2, fp );
-    fread( &cdh->compression_method, sizeof(char), 2, fp );
-    fread( &cdh->last_mod_file_time, sizeof(char), 2, fp );
-    fread( &cdh->last_mod_file_date, sizeof(char), 2, fp );
-    fread( &cdh->crc_32, sizeof(char), 4, fp );
-    fread( &cdh->compressed_size, sizeof(char), 4, fp );
-    fread( &cdh->uncompressed_size, sizeof(char), 4, fp );
-    fread( &cdh->file_name_length, sizeof(char), 2, fp );
-    fread( &cdh->extra_field_length, sizeof(char), 2, fp );
-    fread( &cdh->file_comment_length, sizeof(char), 2, fp );
-    fread( &cdh->disk_number_start, sizeof(char), 2, fp );
-    fread( &cdh->internal_file_attributes, sizeof(char), 2, fp );
-    fread( &cdh->external_file_attributes, sizeof(char), 4, fp );
-    fread( &cdh->relative_offset_of_local_header, sizeof(char), 4, fp );
+    char buffer[CENTRAL_DIRECTORY_HEADER_LENGTH];
+    size_t chk = fread( buffer, 1, CENTRAL_DIRECTORY_HEADER_LENGTH, fp ); /* FIXME */
+    if (chk != CENTRAL_DIRECTORY_HEADER_LENGTH ){
+        fprintf(stderr, "Cannot read buffer.\n");
+        return;
+    }
+
+    if (*(uint32_t*)(buffer) != 0x02014b50 ) /* Whoops! */
+        return;
+
+    cdh->central_file_header_signature   = *(uint32_t*)(buffer);     /*  4 bytes */
+    cdh->version_made_by                 = *(uint32_t*)(buffer+4);   /*  2 bytes */
+    cdh->version_needed_to_extract       = *(uint32_t*)(buffer+6);   /*  2 bytes */
+    cdh->general_purpose_bit_flag        = *(uint32_t*)(buffer+8);   /*  2 bytes */
+    cdh->compression_method              = *(uint32_t*)(buffer+10);  /*  2 bytes */
+    cdh->last_mod_file_time              = *(uint32_t*)(buffer+12);  /*  2 bytes */
+    cdh->last_mod_file_date              = *(uint32_t*)(buffer+14);  /*  2 bytes */
+    cdh->crc_32                          = *(uint32_t*)(buffer+16);  /*  4 bytes */
+    cdh->compressed_size                 = *(uint32_t*)(buffer+20);  /*  4 bytes */
+    cdh->uncompressed_size               = *(uint32_t*)(buffer+24);  /*  4 bytes */
+    cdh->file_name_length                = *(uint32_t*)(buffer+28);  /*  2 bytes */
+    cdh->extra_field_length              = *(uint32_t*)(buffer+30);  /*  2 bytes */
+    cdh->file_comment_length             = *(uint32_t*)(buffer+32);  /*  2 bytes */
+    cdh->disk_number_start               = *(uint32_t*)(buffer+34);  /*  2 bytes */
+    cdh->internal_file_attributes        = *(uint32_t*)(buffer+36);  /*  2 bytes */
+    cdh->external_file_attributes        = *(uint32_t*)(buffer+38);  /*  4 bytes */
+    cdh->relative_offset_of_local_header = *(uint32_t*)(buffer+42);  /*  4 bytes */
 
     cdh->file_name = calloc( cdh->file_name_length+1, sizeof(char));
     assert( cdh->file_name);
