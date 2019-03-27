@@ -1,5 +1,6 @@
 #include "c_npy.h"
 #include "zipcontainer.h"
+#include "crc32.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -30,6 +31,67 @@ typedef struct _cmatrix_t {
     bool     fortran_order;
 } cmatrix_t;
 */
+
+static void _header_from_cmatrix( const cmatrix_t *m,  char *buf, size_t *hlen )
+{
+    char *p = buf;
+
+    static char magic[] = C_NPY_MAGIC_STRING;
+    memcpy( p, magic, C_NPY_MAGIC_LENGTH );
+    p += C_NPY_MAGIC_LENGTH;
+
+    static char version[C_NPY_HEADER_LENGTH] = { 1, 0 };
+    memcpy( p, version, C_NPY_HEADER_LENGTH );
+    p += C_NPY_HEADER_LENGTH;
+
+    char dict[C_NPY_DICT_BUFSIZE] = { 0 };
+    char shape[C_NPY_SHAPE_BUFSIZE] = { 0 };
+    char *ptr = shape;
+
+    for( int i = 0; i < m->ndim - 1; i++)
+        ptr += sprintf(ptr, "%d, ", (int) m->shape[i]);
+    ptr += sprintf( ptr, "%d", (int) m->shape[m->ndim-1] );
+    assert( ptr - shape < C_NPY_SHAPE_BUFSIZE );
+
+    /* Potential bug? There are some additional whitespaces after the dictionaries saved from
+     * Python/Numpy. Those are not documented? I have tested that this dictionary actually works */
+    size_t len = sprintf(dict, "{'descr': '%c%c%c', 'fortran_order': %s, 'shape': (%s), }\n",
+            m->endianness,
+            m->typechar,
+            (char) m->elem_size + '0',
+            m->fortran_order ? "True": "False",
+            shape);
+
+    assert( len < C_NPY_DICT_BUFSIZE );
+    uint16_t len_short = (uint16_t) len;
+    memcpy( p, &len_short, sizeof(uint16_t));
+    p += sizeof(uint16_t);
+
+    memcpy( p, dict, len);
+    *hlen = len + C_NPY_PREHEADER_LENGTH;
+}
+
+static size_t _calculate_datasize( const cmatrix_t *m )
+{
+    size_t n_elements = 1;
+    int idx = 0;
+    while ( m->shape[ idx ] > 0 && (idx < m->ndim) )
+        n_elements *= m->shape[ idx++ ];
+    return n_elements * m->elem_size;
+}
+
+static uint32_t _crc32_from_cmatrix( const cmatrix_t *m )
+{
+    char header[C_NPY_DICT_BUFSIZE + C_NPY_PREHEADER_LENGTH] = {'\0'};
+
+    size_t hlen = 0;
+    _header_from_cmatrix( m, header, &hlen );
+    size_t datasize = _calculate_datasize( m );
+    uint32_t crc;
+    crc = crc32( 0, header, strlen(header) );
+    return crc32( crc, m->data, datasize );
+}
+
 
 static cmatrix_t * _read_matrix( FILE *fp );
 static void _read_end_of_central_dir( FILE *fp, end_of_central_dir_t *eocd );
@@ -477,6 +539,32 @@ void c_npy_matrix_dump( const cmatrix_t *m )
     return;
 }
 
+/* FIXME: tell caller about the fails */
+static void _write_matrix( const cmatrix_t *m, FILE *fp )
+{
+
+    char header[C_NPY_DICT_BUFSIZE + C_NPY_PREHEADER_LENGTH] = {'\0'};
+
+    size_t hlen = 0;
+    _header_from_cmatrix( m, header, &hlen );
+
+    size_t chk = fwrite( header, sizeof(char), hlen, fp );
+    if( chk != hlen){
+        fprintf(stderr, "Could not write header data.\n");
+    }
+
+    size_t n_elements = 1;
+    int idx = 0;
+    while ( m->shape[ idx ] > 0 )
+        n_elements *= m->shape[ idx++ ];
+
+    chk = fwrite( m->data, m->elem_size, n_elements, fp );
+    if( chk != n_elements){
+        fprintf(stderr, "Could not write all data.\n");
+    }
+    return;
+}
+
 void c_npy_matrix_write_file( const char *filename, const cmatrix_t *m )
 {
     if( !m ){
@@ -490,69 +578,8 @@ void c_npy_matrix_write_file( const char *filename, const cmatrix_t *m )
         perror("Error");
         return;
     }
-
-    static char magic[] = C_NPY_MAGIC_STRING;
-    size_t chk = fwrite( magic, sizeof(char), C_NPY_MAGIC_LENGTH, fp );
-    if( chk != C_NPY_MAGIC_LENGTH ){
-        fprintf(stderr, "Cannot write magic.\n");
-        fclose(fp);
-        return;
-    }
-
-    char version[C_NPY_HEADER_LENGTH] = { 1, 0 };
-    chk = fwrite( version, sizeof(char), C_NPY_HEADER_LENGTH, fp );
-    if( chk != C_NPY_HEADER_LENGTH ){
-        fprintf(stderr, "Cannot write version.\n");
-        fclose(fp);
-        return;
-    }
-
-    char dict[C_NPY_DICT_BUFSIZE] = { 0 };
-    char shape[C_NPY_SHAPE_BUFSIZE] = { 0 };
-    char *ptr = shape;
-
-    for( int i = 0; i < m->ndim - 1; i++)
-        ptr += sprintf(ptr, "%d, ", (int) m->shape[i]);
-    ptr += sprintf( ptr, "%d", (int) m->shape[m->ndim-1] );
-    assert( ptr - shape < C_NPY_SHAPE_BUFSIZE );
-
-    /* Potential bug? There are some additional whitespaces after the dictionaries saved from
-     * Python/Numpy. Those are not documented? I have tested that this dictionary actually works */
-    size_t len = sprintf(dict, "{'descr': '%c%c%c', 'fortran_order': %s, 'shape': (%s), }",
-            m->endianness,
-            m->typechar,
-            (char) m->elem_size + '0',
-            m->fortran_order ? "True": "False",
-            shape);
-
-    assert( len < C_NPY_DICT_BUFSIZE );
-    uint16_t len_short = (uint16_t) len;
-    chk = fwrite( &len_short, sizeof(uint16_t), 1, fp);
-    if( chk != 1 ){
-        fprintf(stderr, "Cannot write header size.\n");
-        fclose(fp);
-        return;
-    }
-
-    chk = fwrite( dict, sizeof(char), len, fp);
-    if( chk != len ){
-        fprintf(stderr, "Cannot write header.\n");
-        fclose(fp);
-        return;
-    }
-
-    size_t n_elements = 1;
-    int idx = 0;
-    while ( m->shape[ idx ] > 0 )
-        n_elements *= m->shape[ idx++ ];
-
-    chk = fwrite( m->data, m->elem_size, n_elements, fp );
-    if( chk != n_elements){
-        fprintf(stderr, "Could not write all data.\n");
-    }
-
+    _write_matrix( m, fp );
     fclose(fp);
-    return;
 }
 
 void c_npy_matrix_free( cmatrix_t *m )
