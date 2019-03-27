@@ -44,31 +44,45 @@ static void _header_from_cmatrix( const cmatrix_t *m,  char *buf, size_t *hlen )
     memcpy( p, version, C_NPY_HEADER_LENGTH );
     p += C_NPY_HEADER_LENGTH;
 
-    char dict[C_NPY_DICT_BUFSIZE] = { 0 };
-    char shape[C_NPY_SHAPE_BUFSIZE] = { 0 };
+    char dict[C_NPY_DICT_BUFSIZE] = { '\0' };
+    char shape[C_NPY_SHAPE_BUFSIZE] = { '\0' };
     char *ptr = shape;
 
-    for( int i = 0; i < m->ndim - 1; i++)
-        ptr += sprintf(ptr, "%d, ", (int) m->shape[i]);
-    ptr += sprintf( ptr, "%d", (int) m->shape[m->ndim-1] );
+    for( int i = 0; i < m->ndim; i++)
+        ptr += sprintf(ptr, "%d,", (int) m->shape[i]);
     assert( ptr - shape < C_NPY_SHAPE_BUFSIZE );
+
 
     /* Potential bug? There are some additional whitespaces after the dictionaries saved from
      * Python/Numpy. Those are not documented? I have tested that this dictionary actually works */
-    size_t len = sprintf(dict, "{'descr': '%c%c%c', 'fortran_order': %s, 'shape': (%s), }\n",
+
+    /* Yes. It seems to work without all the whitespaces, however it does say:
+
+       It is terminated by a newline (\n) and padded with spaces (\x20) to make the total of:
+       len(magic string) + 2 + len(length) + HEADER_LEN be evenly divisible by 64 for alignment purposes.
+
+       ... which sounds smart enough for me, and with some reverse engineering it looks like HEADER_LEN is 108.
+
+     */
+#define HEADER_LEN 108
+    /* WARNING: This code looks inocent and simple, but it was really a struggle. Do not touch unless you like pain! */
+    size_t len = sprintf(dict, "{'descr': '%c%c%c', 'fortran_order': %s, 'shape': (%s), }",
             m->endianness,
             m->typechar,
             (char) m->elem_size + '0',
             m->fortran_order ? "True": "False",
-            shape);
+            shape );
 
-    assert( len < C_NPY_DICT_BUFSIZE );
-    uint16_t len_short = (uint16_t) len;
-    memcpy( p, &len_short, sizeof(uint16_t));
+    assert( len < HEADER_LEN ); /* FIXME: This can go wrong for really big arrays with a lot of dimensions */
+    len += sprintf( dict + len, "%*s\n", HEADER_LEN - len + C_NPY_PREHEADER_LENGTH - 1, " " );
+
+    const uint16_t _len = (uint16_t) (len);
+    memcpy( p, &_len, sizeof(uint16_t));
     p += sizeof(uint16_t);
-
     memcpy( p, dict, len);
+
     *hlen = len + C_NPY_PREHEADER_LENGTH;
+#undef HEADER_LEN
 }
 
 static size_t _calculate_datasize( const cmatrix_t *m )
@@ -427,7 +441,7 @@ static cmatrix_t * _read_matrix( FILE *fp )
     uint16_t header_length = 0;
     header_length |= fixed_header[C_NPY_HEADER_LENGTH_LOW_IDX];
     header_length |= fixed_header[C_NPY_HEADER_LENGTH_HIGH_IDX] << 8;   /* Is a byte always 8 bit? */
-
+    
     char header[header_length + 1];
     chk = fread( header, sizeof(char), header_length, fp );
     if( chk != header_length){
@@ -547,6 +561,7 @@ static void _write_matrix( const cmatrix_t *m, FILE *fp )
 
     size_t hlen = 0;
     _header_from_cmatrix( m, header, &hlen );
+    printf( "dict: '%s' %d\n", header+10, strlen(header+10));
 
     size_t chk = fwrite( header, sizeof(char), hlen, fp );
     if( chk != hlen){

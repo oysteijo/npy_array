@@ -23,8 +23,12 @@ int main(int argc, char *argv[])
     }
 
     printf("number of objects in file: %lu\n", len);
-    for (unsigned int i = 0; i < len; i++ )
+    for (unsigned int i = 0; i < len; i++ ){
         c_npy_matrix_dump( arr[i] );
+        char fn[40];
+        sprintf(fn, "written%d.npy", i);
+        c_npy_matrix_write_file( fn, arr[i] );
+    }
 
 
     //c_npy_matrix_write_file( "tester_save.npy", m);
