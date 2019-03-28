@@ -1,6 +1,7 @@
 #include "c_npy.h"
 #include "zipcontainer.h"
 #include "crc32.h"
+#include "dostime.h"
 
 #include <stdio.h>
 #include <string.h>
@@ -31,6 +32,88 @@ typedef struct _cmatrix_t {
     bool     fortran_order;
 } cmatrix_t;
 */
+
+#if 1
+
+static void _write_local_fileheader( local_file_header_t *lf, FILE *fp )
+{
+}
+
+int c_npy_matrix_array_write( const char *filename, cmatrix_t **array )
+{
+    FILE *fp;
+    if ( !(fp = fopen( filename, "rb" ) ) ){
+        fprintf(stderr, "Cannot open file for writing");
+        return -1;
+    }
+
+    int n = (int) c_npy_matrix_array_length( array );
+
+    for ( int i = 0; i < n; i++ ){
+        /* Set the name of the file */
+        char arrname[42] = {'\0' };
+        sprintf( arrname, "arr_%d", i );
+
+        /* Find the time */
+        time_t now = time(NULL);
+        dostime_t dt_now = unix2dostime( now );
+
+        uint32_t size;
+        uint32_t crc32 = _crc32_from_cmatrix( array[i], &size );
+
+        local_file_header_t lfh = {
+            .local_file_header_signature = 0x04034b50,                   /*  4 bytes  (0x04034b50) */
+            .version_needed_to_extract   = 20,                           /*  2 bytes */
+            .last_mod_file_time          = (uint16_t) (dt_now & 0xffff), /*  2 bytes */
+            .last_mod_file_date          = (uint16_t) (dt_now >> 16),    /*  2 bytes */
+            .crc_32                      = crc32,                        /*  4 bytes */
+            .compressed_size             = size,                         /*  4 bytes */
+            .uncompressed_size           = size,                         /*  4 bytes */
+            .file_name_length            = strlen(arrname),              /*  2 bytes */
+            .file_name                   = arrname                       /*  (variable size) */
+        };
+        _write_local_fileheader( &lfh, fp );
+        _write_matrix          ( array[i], fp );
+    }
+
+    for ( int i = 0; i < n; i++ ){
+        /* central directory */
+        char arrname[42] = {'\0' };
+        sprintf( arrname, "arr_%d", i );
+
+        /* Find the time */
+        /* OK ... the time might be different in CD than in local, but I guess that's not a problem? */
+        time_t now = time(NULL);
+        dostime_t dt_now = unix2dostime( now );
+
+        uint32_t size;
+        uint32_t crc32 = _crc32_from_cmatrix( array[i], &size );
+        central_directory_header_t cdh = {
+            .central_file_header_signature = 0x02014b50, /* 4 bytes */
+            .version_made_by               = 788,  /* My python uses this. Whould I use something else? */ /* 2 bytes */
+            .version_needed_to_extract     = 20,       /* 2 bytes */
+            .last_mod_file_time            = (uint16_t) (dt_now & 0xffff), /*  2 bytes */
+            .last_mod_file_date            = (uint16_t) (dt_now >> 16),    /*  2 bytes */
+            .crc_32                        = crc32,                        /*  4 bytes */
+            .compressed_size               = size,                         /*  4 bytes */
+            .uncompressed_size             = size,                         /*  4 bytes */
+            .file_name_length              = strlen(arrname),              /*  2 bytes */
+            .file_name                     = arrname                       /*  (variable size) */
+        };
+        /* Oh! I have to count */
+        //    .relative_offset_of_local_header; /* 4 bytes */
+
+        _write_cental_directory_fileheader( &cdh, fp );
+    }
+    end_of_central_dir_t eocd = {
+    };
+
+    _write_eocd( &eocd, fp );
+    return n;
+}
+
+
+#endif
 
 static void _header_from_cmatrix( const cmatrix_t *m,  char *buf, size_t *hlen )
 {
@@ -94,13 +177,14 @@ static size_t _calculate_datasize( const cmatrix_t *m )
     return n_elements * m->elem_size;
 }
 
-static uint32_t _crc32_from_cmatrix( const cmatrix_t *m )
+static uint32_t _crc32_from_cmatrix( const cmatrix_t *m, uint32_t *size )
 {
     char header[C_NPY_DICT_BUFSIZE + C_NPY_PREHEADER_LENGTH] = {'\0'};
 
     size_t hlen = 0;
     _header_from_cmatrix( m, header, &hlen );
     size_t datasize = _calculate_datasize( m );
+    if(size) size = hlen + datasize;
     uint32_t crc;
     crc = crc32( 0, header, strlen(header) );
     return crc32( crc, m->data, datasize );
