@@ -37,8 +37,10 @@ The API is really simple. There is only seven functions:
 
     /* Reading an array of matrices from a .npz file. */
     cmatrix_t ** c_npy_matrix_array_read  ( const char *filename );
-    size_t       c_npy_matrix_array_length( cmatrix_t **arr);
+    int          c_npy_matrix_array_write ( const char *filename, const cmatrix_t **array );
+    size_t       c_npy_matrix_array_length( const cmatrix_t **arr);
     void         c_npy_matrix_array_free  ( cmatrix_t **arr );
+
 ## Example usage.
 Here is a really simple example. You can compile this with:
 
@@ -61,7 +63,7 @@ You can the run example with a numpy file as argument.
 ## Compilation/Install
 There is only one object file: `c_npy.o`
 This will be compiled if you type `make`. The object file can be statically linked
-in to your executable.
+in to your executable. (Well... crc and dostime has been added)
 
 ## Status
 This is written in a full hurry one afternoon. There is not much tested
@@ -70,7 +72,8 @@ goes wrong. All errors are written to STDERR. Consider this alpha.
 
 ## TODO
  * Bugfixes
- * Support for `.npz` files (files containing several numpy arrays.)
-   **Update:** I just added rudimentary support for reading uncompressed `.npz` files. (No writing yet.)
+ * Documentation
+ * Cleanup
+ * Refactorisation
  * Nicer install/make a dynamic library or at least an archive lib.
 

@@ -33,87 +33,60 @@ typedef struct _cmatrix_t {
 } cmatrix_t;
 */
 
-#if 1
-
 static void _write_local_fileheader( local_file_header_t *lf, FILE *fp )
 {
+    fwrite( &lf->local_file_header_signature, sizeof(uint32_t), 1, fp) ;    /*  4 bytes  (0x04034b50) */
+    fwrite( &lf->version_needed_to_extract,   sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
+    fwrite( &lf->general_purpose_bit_flag,    sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
+    fwrite( &lf->compression_method,          sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
+    fwrite( &lf->last_mod_file_time,          sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
+    fwrite( &lf->last_mod_file_date,          sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
+    fwrite( &lf->crc_32,                      sizeof(uint32_t), 1, fp) ;    /*  4 bytes */
+    fwrite( &lf->compressed_size,             sizeof(uint32_t), 1, fp) ;    /*  4 bytes */
+    fwrite( &lf->uncompressed_size,           sizeof(uint32_t), 1, fp) ;    /*  4 bytes */
+    fwrite( &lf->file_name_length,            sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
+    fwrite( &lf->extra_field_length,          sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
+    fwrite(  lf->file_name,                   sizeof(char), lf->file_name_length, fp) ;    /*  4 bytes  (0x04034b50) */
+    fwrite(  lf->extra_field,                 sizeof(char), lf->extra_field_length, fp) ;    /*  4 bytes  (0x04034b50) */
 }
 
-int c_npy_matrix_array_write( const char *filename, cmatrix_t **array )
+static void _write_cental_directory_fileheader( central_directory_header_t *cdh, FILE *fp )
 {
-    FILE *fp;
-    if ( !(fp = fopen( filename, "rb" ) ) ){
-        fprintf(stderr, "Cannot open file for writing");
-        return -1;
-    }
+    fwrite ( &cdh->central_file_header_signature, sizeof(uint32_t), 1, fp);   /* 4 bytes  (0x02014b50) */
+    fwrite ( &cdh->version_made_by, sizeof(uint16_t), 1, fp);                 /* 2 bytes */
+    fwrite ( &cdh->version_needed_to_extract, sizeof(uint16_t), 1, fp);       /* 2 bytes */
+    fwrite ( &cdh->general_purpose_bit_flag, sizeof(uint16_t), 1, fp);        /* 2 bytes */
+    fwrite ( &cdh->compression_method, sizeof(uint16_t), 1, fp);              /* 2 bytes */
+    fwrite ( &cdh->last_mod_file_time, sizeof(uint16_t), 1, fp);              /* 2 bytes */
+    fwrite ( &cdh->last_mod_file_date, sizeof(uint16_t), 1, fp);              /* 2 bytes */
+    fwrite ( &cdh->crc_32, sizeof(uint32_t), 1, fp);                          /* 4 bytes */
+    fwrite ( &cdh->compressed_size, sizeof(uint32_t), 1, fp);                 /* 4 bytes */
+    fwrite ( &cdh->uncompressed_size, sizeof(uint32_t), 1, fp);               /* 4 bytes */
+    fwrite ( &cdh->file_name_length, sizeof(uint16_t), 1, fp);                /* 2 bytes */
+    fwrite ( &cdh->extra_field_length, sizeof(uint16_t), 1, fp);              /* 2 bytes */
+    fwrite ( &cdh->file_comment_length, sizeof(uint16_t), 1, fp);             /* 2 bytes */
+    fwrite ( &cdh->disk_number_start, sizeof(uint16_t), 1, fp);               /* 2 bytes */
+    fwrite ( &cdh->internal_file_attributes, sizeof(uint16_t), 1, fp);        /* 2 bytes */
+    fwrite ( &cdh->external_file_attributes, sizeof(uint32_t), 1, fp);        /* 4 bytes */
+    fwrite ( &cdh->relative_offset_of_local_header, sizeof(uint32_t), 1, fp); /* 4 bytes */
 
-    int n = (int) c_npy_matrix_array_length( array );
-
-    for ( int i = 0; i < n; i++ ){
-        /* Set the name of the file */
-        char arrname[42] = {'\0' };
-        sprintf( arrname, "arr_%d", i );
-
-        /* Find the time */
-        time_t now = time(NULL);
-        dostime_t dt_now = unix2dostime( now );
-
-        uint32_t size;
-        uint32_t crc32 = _crc32_from_cmatrix( array[i], &size );
-
-        local_file_header_t lfh = {
-            .local_file_header_signature = 0x04034b50,                   /*  4 bytes  (0x04034b50) */
-            .version_needed_to_extract   = 20,                           /*  2 bytes */
-            .last_mod_file_time          = (uint16_t) (dt_now & 0xffff), /*  2 bytes */
-            .last_mod_file_date          = (uint16_t) (dt_now >> 16),    /*  2 bytes */
-            .crc_32                      = crc32,                        /*  4 bytes */
-            .compressed_size             = size,                         /*  4 bytes */
-            .uncompressed_size           = size,                         /*  4 bytes */
-            .file_name_length            = strlen(arrname),              /*  2 bytes */
-            .file_name                   = arrname                       /*  (variable size) */
-        };
-        _write_local_fileheader( &lfh, fp );
-        _write_matrix          ( array[i], fp );
-    }
-
-    for ( int i = 0; i < n; i++ ){
-        /* central directory */
-        char arrname[42] = {'\0' };
-        sprintf( arrname, "arr_%d", i );
-
-        /* Find the time */
-        /* OK ... the time might be different in CD than in local, but I guess that's not a problem? */
-        time_t now = time(NULL);
-        dostime_t dt_now = unix2dostime( now );
-
-        uint32_t size;
-        uint32_t crc32 = _crc32_from_cmatrix( array[i], &size );
-        central_directory_header_t cdh = {
-            .central_file_header_signature = 0x02014b50, /* 4 bytes */
-            .version_made_by               = 788,  /* My python uses this. Whould I use something else? */ /* 2 bytes */
-            .version_needed_to_extract     = 20,       /* 2 bytes */
-            .last_mod_file_time            = (uint16_t) (dt_now & 0xffff), /*  2 bytes */
-            .last_mod_file_date            = (uint16_t) (dt_now >> 16),    /*  2 bytes */
-            .crc_32                        = crc32,                        /*  4 bytes */
-            .compressed_size               = size,                         /*  4 bytes */
-            .uncompressed_size             = size,                         /*  4 bytes */
-            .file_name_length              = strlen(arrname),              /*  2 bytes */
-            .file_name                     = arrname                       /*  (variable size) */
-        };
-        /* Oh! I have to count */
-        //    .relative_offset_of_local_header; /* 4 bytes */
-
-        _write_cental_directory_fileheader( &cdh, fp );
-    }
-    end_of_central_dir_t eocd = {
-    };
-
-    _write_eocd( &eocd, fp );
-    return n;
+    fwrite ( cdh->file_name,    sizeof(char), cdh->file_name_length, fp);    /*  (variable size) */
+    fwrite ( cdh->extra_field,  sizeof(char), cdh->extra_field_length, fp);  /*  (variable size) */
+    fwrite ( cdh->file_comment, sizeof(char), cdh->file_comment_length, fp); /*  (variable size) */
 }
 
-
-#endif
+static void _write_eocd( end_of_central_dir_t *eocd, FILE *fp )
+{
+    fwrite( &eocd->end_of_central_dir_signature, sizeof(uint32_t), 1, fp);    /*  4 bytes (0x06054b50) */
+    fwrite( &eocd->number_of_this_disk, sizeof(uint16_t), 1, fp);             /*  2 bytes */
+    fwrite( &eocd->number_of_the_disk_start_of_cd, sizeof(uint16_t), 1, fp);  /*  2 bytes */ 
+    fwrite( &eocd->total_num_entries_this_disk, sizeof(uint16_t), 1, fp);     /*  2 bytes */
+    fwrite( &eocd->total_num_entries_cd, sizeof(uint16_t), 1, fp);            /*  2 bytes */
+    fwrite( &eocd->size_of_cd, sizeof(uint32_t), 1, fp);                      /*  4 bytes */
+    fwrite( &eocd->offset_cd_wrt_disknum, sizeof(uint32_t), 1, fp);           /*  4 bytes */
+    fwrite( &eocd->ZIP_file_comment_length, sizeof(uint16_t), 1, fp);         /*  2 bytes */
+    fwrite( eocd->ZIP_file_comment, sizeof(char), eocd->ZIP_file_comment_length, fp );  /*  (variable size) */
+}
 
 static void _header_from_cmatrix( const cmatrix_t *m,  char *buf, size_t *hlen )
 {
@@ -157,7 +130,7 @@ static void _header_from_cmatrix( const cmatrix_t *m,  char *buf, size_t *hlen )
             shape );
 
     assert( len < HEADER_LEN ); /* FIXME: This can go wrong for really big arrays with a lot of dimensions */
-    len += sprintf( dict + len, "%*s\n", HEADER_LEN - len + C_NPY_PREHEADER_LENGTH - 1, " " );
+    len += sprintf( dict + len, "%*s\n", (int) (HEADER_LEN - len + C_NPY_PREHEADER_LENGTH - 1), " " );
 
     const uint16_t _len = (uint16_t) (len);
     memcpy( p, &_len, sizeof(uint16_t));
@@ -184,12 +157,120 @@ static uint32_t _crc32_from_cmatrix( const cmatrix_t *m, uint32_t *size )
     size_t hlen = 0;
     _header_from_cmatrix( m, header, &hlen );
     size_t datasize = _calculate_datasize( m );
-    if(size) size = hlen + datasize;
+    if(size) *size = hlen + datasize;
     uint32_t crc;
-    crc = crc32( 0, header, strlen(header) );
+    crc = crc32( 0, header, hlen );
     return crc32( crc, m->data, datasize );
 }
 
+/* FIXME: tell caller about the fails */
+static void _write_matrix( const cmatrix_t *m, FILE *fp )
+{
+
+    char header[C_NPY_DICT_BUFSIZE + C_NPY_PREHEADER_LENGTH] = {'\0'};
+
+    size_t hlen = 0;
+    _header_from_cmatrix( m, header, &hlen );
+
+    size_t chk = fwrite( header, sizeof(char), hlen, fp );
+    if( chk != hlen){
+        fprintf(stderr, "Could not write header data.\n");
+    }
+
+    size_t n_elements = 1;
+    int idx = 0;
+    while ( m->shape[ idx ] > 0 )
+        n_elements *= m->shape[ idx++ ];
+
+    chk = fwrite( m->data, m->elem_size, n_elements, fp );
+    if( chk != n_elements){
+        fprintf(stderr, "Could not write all data.\n");
+    }
+    return;
+}
+
+int c_npy_matrix_array_write( const char *filename, const cmatrix_t **array )
+{
+    FILE *fp = fopen( filename, "wb" );
+    if ( !fp ){
+        fprintf(stderr, "Cannot open file '%s' for writing\n", filename);
+        return -1;
+    }
+
+    int n = (int) c_npy_matrix_array_length( array );
+
+    for ( int i = 0; i < n; i++ ){
+        /* Set the name of the file */
+        char arrname[42] = {'\0' };
+        sprintf( arrname, "arr_%d", i );
+
+        /* Find the time */
+        time_t now = time(NULL);
+        dostime_t dt_now = unix2dostime( now );
+
+        uint32_t size = 0;
+        uint32_t crc32 = _crc32_from_cmatrix( array[i], &size );
+
+        local_file_header_t lfh = {
+            .local_file_header_signature = 0x04034b50,                   /*  4 bytes  (0x04034b50) */
+            .version_needed_to_extract   = 20,                           /*  2 bytes */
+            .last_mod_file_time          = (uint16_t) (dt_now & 0xffff), /*  2 bytes */
+            .last_mod_file_date          = (uint16_t) (dt_now >> 16),    /*  2 bytes */
+            .crc_32                      = crc32,                        /*  4 bytes */
+            .compressed_size             = size,                         /*  4 bytes */
+            .uncompressed_size           = size,                         /*  4 bytes */
+            .file_name_length            = strlen(arrname),              /*  2 bytes */
+            .file_name                   = arrname                       /*  (variable size) */
+        };
+        _write_local_fileheader( &lfh, fp );
+        _write_matrix          ( array[i], fp );
+    }
+
+    uint32_t offset_count = 0;
+    uint32_t total_namelength = 0;
+    for ( int i = 0; i < n; i++ ){
+        /* central directory */
+        char arrname[42] = {'\0' };
+        sprintf( arrname, "arr_%d", i );
+
+        /* Find the time */
+        /* OK ... the time might be different in CD than in local, but I guess that's not a problem? */
+        time_t now = time(NULL);
+        dostime_t dt_now = unix2dostime( now );
+
+        uint32_t size;
+        uint32_t crc32 = _crc32_from_cmatrix( array[i], &size );
+        central_directory_header_t cdh = {
+            .central_file_header_signature = 0x02014b50, /* 4 bytes */
+            .version_made_by               = 788,        /* My python uses this. Should I use something else? */ /* 2 bytes */
+            .version_needed_to_extract     = 20,         /* 2 bytes */
+            .last_mod_file_time            = (uint16_t) (dt_now & 0xffff), /*  2 bytes */
+            .last_mod_file_date            = (uint16_t) (dt_now >> 16),    /*  2 bytes */
+            .crc_32                        = crc32,                        /*  4 bytes */
+            .compressed_size               = size,                         /*  4 bytes */
+            .uncompressed_size             = size,                         /*  4 bytes */
+            .external_file_attributes      = 0x1a40000,                    /*  Unix: -rw-r--r-- (644) */
+            .file_name_length              = strlen(arrname),              /*  2 bytes */
+            .file_name                     = arrname,                      /*  (variable size) */
+            .relative_offset_of_local_header = offset_count                /* 4 bytes */
+        };
+        /* Oh! I have to count */
+        _write_cental_directory_fileheader( &cdh, fp );
+        offset_count += size + cdh.file_name_length + LOCAL_HEADER_LENGTH;
+        total_namelength += cdh.file_name_length;
+    }
+
+    end_of_central_dir_t eocd = {
+        .end_of_central_dir_signature    = 0x06054b50,       /*  4 bytes (0x06054b50) */
+        .total_num_entries_this_disk     = (uint16_t) n,     /*  2 bytes */
+        .total_num_entries_cd            = (uint16_t) n,     /*  2 bytes */
+        .size_of_cd                      = (uint32_t) n * CENTRAL_DIRECTORY_HEADER_LENGTH + total_namelength,  /*  4 bytes */
+        .offset_cd_wrt_disknum           = offset_count     /*  4 bytes */
+    };
+
+    _write_eocd( &eocd, fp );
+    return n;
+}
 
 static cmatrix_t * _read_matrix( FILE *fp );
 static void _read_end_of_central_dir( FILE *fp, end_of_central_dir_t *eocd );
@@ -328,7 +409,7 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
         count++;
         assert( count < _MAX_ARRAY_LENGTH );
     }
-
+#if 1 // I_REALLY_DONT_CARE_ABOUT_THIS_SINCE_IVE_ALREADY_READ_ALL_THE_DATA_I_NEED
     /* FIXME: Read all the central directory */
     central_directory_header_t cdh;
     /* OK reading a local header failed, so we have to go back some bytes */
@@ -346,7 +427,7 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
     end_of_central_dir_t eocd = {0};
     _read_end_of_central_dir( fp, &eocd );
     end_of_central_dir_dump( &eocd );
-
+#endif
     /* size_t len = c_npy_matrix_array_length( _array ); */
     size_t len = count;
     if( len == 0 ){
@@ -481,7 +562,7 @@ static void _central_directory_header_dump( central_directory_header_t *cdh )
     printf("Filecomment: %s\n", cdh->file_comment );
 }
 
-size_t c_npy_matrix_array_length( cmatrix_t **arr)
+size_t c_npy_matrix_array_length( const cmatrix_t **arr)
 {
     if (!arr) return 0;
     size_t len = 0;
@@ -492,7 +573,8 @@ size_t c_npy_matrix_array_length( cmatrix_t **arr)
 
 void c_npy_matrix_array_free( cmatrix_t **arr )
 {
-    size_t len = c_npy_matrix_array_length( arr );
+    size_t len = c_npy_matrix_array_length( (const cmatrix_t**) arr );
+
     for( unsigned int i = 0; i < len; i++)
         c_npy_matrix_free( arr[i] );
     free( arr );
@@ -637,32 +719,6 @@ void c_npy_matrix_dump( const cmatrix_t *m )
     return;
 }
 
-/* FIXME: tell caller about the fails */
-static void _write_matrix( const cmatrix_t *m, FILE *fp )
-{
-
-    char header[C_NPY_DICT_BUFSIZE + C_NPY_PREHEADER_LENGTH] = {'\0'};
-
-    size_t hlen = 0;
-    _header_from_cmatrix( m, header, &hlen );
-    printf( "dict: '%s' %d\n", header+10, strlen(header+10));
-
-    size_t chk = fwrite( header, sizeof(char), hlen, fp );
-    if( chk != hlen){
-        fprintf(stderr, "Could not write header data.\n");
-    }
-
-    size_t n_elements = 1;
-    int idx = 0;
-    while ( m->shape[ idx ] > 0 )
-        n_elements *= m->shape[ idx++ ];
-
-    chk = fwrite( m->data, m->elem_size, n_elements, fp );
-    if( chk != n_elements){
-        fprintf(stderr, "Could not write all data.\n");
-    }
-    return;
-}
 
 void c_npy_matrix_write_file( const char *filename, const cmatrix_t *m )
 {
