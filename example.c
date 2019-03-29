@@ -31,7 +31,7 @@ int main(int argc, char *argv[])
     }
 
 
-    // c_npy_matrix_array_write( "written_array.npz", arr);
+    c_npy_matrix_array_write( "written_array.npz", (const cmatrix_t **) arr);
     c_npy_matrix_array_free( arr );
     return 0;
 }

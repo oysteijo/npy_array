@@ -33,61 +33,6 @@ typedef struct _cmatrix_t {
 } cmatrix_t;
 */
 
-static void _write_local_fileheader( local_file_header_t *lf, FILE *fp )
-{
-    fwrite( &lf->local_file_header_signature, sizeof(uint32_t), 1, fp) ;    /*  4 bytes  (0x04034b50) */
-    fwrite( &lf->version_needed_to_extract,   sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
-    fwrite( &lf->general_purpose_bit_flag,    sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
-    fwrite( &lf->compression_method,          sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
-    fwrite( &lf->last_mod_file_time,          sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
-    fwrite( &lf->last_mod_file_date,          sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
-    fwrite( &lf->crc_32,                      sizeof(uint32_t), 1, fp) ;    /*  4 bytes */
-    fwrite( &lf->compressed_size,             sizeof(uint32_t), 1, fp) ;    /*  4 bytes */
-    fwrite( &lf->uncompressed_size,           sizeof(uint32_t), 1, fp) ;    /*  4 bytes */
-    fwrite( &lf->file_name_length,            sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
-    fwrite( &lf->extra_field_length,          sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
-    fwrite(  lf->file_name,                   sizeof(char), lf->file_name_length, fp) ;    /*  4 bytes  (0x04034b50) */
-    fwrite(  lf->extra_field,                 sizeof(char), lf->extra_field_length, fp) ;    /*  4 bytes  (0x04034b50) */
-}
-
-static void _write_cental_directory_fileheader( central_directory_header_t *cdh, FILE *fp )
-{
-    fwrite ( &cdh->central_file_header_signature, sizeof(uint32_t), 1, fp);   /* 4 bytes  (0x02014b50) */
-    fwrite ( &cdh->version_made_by, sizeof(uint16_t), 1, fp);                 /* 2 bytes */
-    fwrite ( &cdh->version_needed_to_extract, sizeof(uint16_t), 1, fp);       /* 2 bytes */
-    fwrite ( &cdh->general_purpose_bit_flag, sizeof(uint16_t), 1, fp);        /* 2 bytes */
-    fwrite ( &cdh->compression_method, sizeof(uint16_t), 1, fp);              /* 2 bytes */
-    fwrite ( &cdh->last_mod_file_time, sizeof(uint16_t), 1, fp);              /* 2 bytes */
-    fwrite ( &cdh->last_mod_file_date, sizeof(uint16_t), 1, fp);              /* 2 bytes */
-    fwrite ( &cdh->crc_32, sizeof(uint32_t), 1, fp);                          /* 4 bytes */
-    fwrite ( &cdh->compressed_size, sizeof(uint32_t), 1, fp);                 /* 4 bytes */
-    fwrite ( &cdh->uncompressed_size, sizeof(uint32_t), 1, fp);               /* 4 bytes */
-    fwrite ( &cdh->file_name_length, sizeof(uint16_t), 1, fp);                /* 2 bytes */
-    fwrite ( &cdh->extra_field_length, sizeof(uint16_t), 1, fp);              /* 2 bytes */
-    fwrite ( &cdh->file_comment_length, sizeof(uint16_t), 1, fp);             /* 2 bytes */
-    fwrite ( &cdh->disk_number_start, sizeof(uint16_t), 1, fp);               /* 2 bytes */
-    fwrite ( &cdh->internal_file_attributes, sizeof(uint16_t), 1, fp);        /* 2 bytes */
-    fwrite ( &cdh->external_file_attributes, sizeof(uint32_t), 1, fp);        /* 4 bytes */
-    fwrite ( &cdh->relative_offset_of_local_header, sizeof(uint32_t), 1, fp); /* 4 bytes */
-
-    fwrite ( cdh->file_name,    sizeof(char), cdh->file_name_length, fp);    /*  (variable size) */
-    fwrite ( cdh->extra_field,  sizeof(char), cdh->extra_field_length, fp);  /*  (variable size) */
-    fwrite ( cdh->file_comment, sizeof(char), cdh->file_comment_length, fp); /*  (variable size) */
-}
-
-static void _write_eocd( end_of_central_dir_t *eocd, FILE *fp )
-{
-    fwrite( &eocd->end_of_central_dir_signature, sizeof(uint32_t), 1, fp);    /*  4 bytes (0x06054b50) */
-    fwrite( &eocd->number_of_this_disk, sizeof(uint16_t), 1, fp);             /*  2 bytes */
-    fwrite( &eocd->number_of_the_disk_start_of_cd, sizeof(uint16_t), 1, fp);  /*  2 bytes */ 
-    fwrite( &eocd->total_num_entries_this_disk, sizeof(uint16_t), 1, fp);     /*  2 bytes */
-    fwrite( &eocd->total_num_entries_cd, sizeof(uint16_t), 1, fp);            /*  2 bytes */
-    fwrite( &eocd->size_of_cd, sizeof(uint32_t), 1, fp);                      /*  4 bytes */
-    fwrite( &eocd->offset_cd_wrt_disknum, sizeof(uint32_t), 1, fp);           /*  4 bytes */
-    fwrite( &eocd->ZIP_file_comment_length, sizeof(uint16_t), 1, fp);         /*  2 bytes */
-    fwrite( eocd->ZIP_file_comment, sizeof(char), eocd->ZIP_file_comment_length, fp );  /*  (variable size) */
-}
-
 static void _header_from_cmatrix( const cmatrix_t *m,  char *buf, size_t *hlen )
 {
     char *p = buf;
@@ -212,7 +157,7 @@ int c_npy_matrix_array_write( const char *filename, const cmatrix_t **array )
         uint32_t crc32 = _crc32_from_cmatrix( array[i], &size );
 
         local_file_header_t lfh = {
-            .local_file_header_signature = 0x04034b50,                   /*  4 bytes  (0x04034b50) */
+            .local_file_header_signature = LOCAL_HEADER_SIGNATURE,                   /*  4 bytes  (LOCAL_HEADER_SIGNATURE) */
             .version_needed_to_extract   = 20,                           /*  2 bytes */
             .last_mod_file_time          = (uint16_t) (dt_now & 0xffff), /*  2 bytes */
             .last_mod_file_date          = (uint16_t) (dt_now >> 16),    /*  2 bytes */
@@ -241,7 +186,7 @@ int c_npy_matrix_array_write( const char *filename, const cmatrix_t **array )
         uint32_t size;
         uint32_t crc32 = _crc32_from_cmatrix( array[i], &size );
         central_directory_header_t cdh = {
-            .central_file_header_signature = 0x02014b50, /* 4 bytes */
+            .central_file_header_signature = CENTRAL_DIRECTORY_HEADER_SIGNATURE, /* 4 bytes */
             .version_made_by               = 788,        /* My python uses this. Should I use something else? */ /* 2 bytes */
             .version_needed_to_extract     = 20,         /* 2 bytes */
             .last_mod_file_time            = (uint16_t) (dt_now & 0xffff), /*  2 bytes */
@@ -261,7 +206,7 @@ int c_npy_matrix_array_write( const char *filename, const cmatrix_t **array )
     }
 
     end_of_central_dir_t eocd = {
-        .end_of_central_dir_signature    = 0x06054b50,       /*  4 bytes (0x06054b50) */
+        .end_of_central_dir_signature    = END_OF_CENTRAL_DIR_SIGNATURE,       /*  4 bytes (END_OF_CENTRAL_DIR_SIGNATURE) */
         .total_num_entries_this_disk     = (uint16_t) n,     /*  2 bytes */
         .total_num_entries_cd            = (uint16_t) n,     /*  2 bytes */
         .size_of_cd                      = (uint32_t) n * CENTRAL_DIRECTORY_HEADER_LENGTH + total_namelength,  /*  4 bytes */
@@ -332,7 +277,7 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
             fprintf(stderr, "Cannot read header.\n");
             break;
         }
-        if (*(uint32_t*)(header) != 0x04034B50 )
+        if (*(uint32_t*)(header) != LOCAL_HEADER_SIGNATURE )
             break;
 
         local_file_header_t lh;
@@ -464,10 +409,10 @@ static void _read_end_of_central_dir( FILE *fp, end_of_central_dir_t *eocd )
         return;
     }
 
-    if (*(uint32_t*)(buffer) != 0x06054b50 ) /* Whoops! */
+    if (*(uint32_t*)(buffer) != END_OF_CENTRAL_DIR_SIGNATURE ) /* Whoops! */
         return;
 
-    eocd->end_of_central_dir_signature   = *(uint32_t*)(buffer);     /*  4 bytes (0x06054b50) */
+    eocd->end_of_central_dir_signature   = *(uint32_t*)(buffer);     /*  4 bytes (END_OF_CENTRAL_DIR_SIGNATURE) */
     eocd->number_of_this_disk            = *(uint16_t*)(buffer+4);   /*  2 bytes */
     eocd->number_of_the_disk_start_of_cd = *(uint16_t*)(buffer+6);   /*  2 bytes */ 
     eocd->total_num_entries_this_disk    = *(uint16_t*)(buffer+8);    /*  2 bytes */
@@ -504,7 +449,7 @@ static void _read_central_directory_header( FILE *fp, central_directory_header_t
         return;
     }
 
-    if (*(uint32_t*)(buffer) != 0x02014b50 ) /* Whoops! */
+    if (*(uint32_t*)(buffer) != CENTRAL_DIRECTORY_HEADER_SIGNATURE ) /* Whoops! */
         return;
 
     cdh->central_file_header_signature   = *(uint32_t*)(buffer);     /*  4 bytes */
@@ -540,7 +485,7 @@ static void _read_central_directory_header( FILE *fp, central_directory_header_t
 
 static void _central_directory_header_dump( central_directory_header_t *cdh )
 {
-    printf("(%d) central_file_header_signature\n", cdh->central_file_header_signature);   /* 4 bytes  (0x02014b50) */
+    printf("(%d) central_file_header_signature\n", cdh->central_file_header_signature);   /* 4 bytes  (CENTRAL_DIRECTORY_HEADER_SIGNATURE) */
     printf("(%d) version_made_by\n", cdh->version_made_by);                 /* 2 bytes */
     printf("(%d) version_needed_to_extract\n", cdh->version_needed_to_extract);       /* 2 bytes */
     printf("(%d) general_purpose_bit_flag\n", cdh->general_purpose_bit_flag);        /* 2 bytes */
