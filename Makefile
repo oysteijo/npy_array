@@ -1,6 +1,6 @@
 CC = gcc
-#DEFINES = -DVERBOSE
-CFLAGS = -std=gnu99 -Wall -Wextra -O3 $(DEFINES)
+DEFINES = -DVERBOSE
+CFLAGS = -std=gnu99 -Wall -Wextra -g -O3 $(DEFINES)
 SOURCE = c_npy.c dostime.c crc32.c zipcontainer.o
 OBJECTS = $(patsubst %.c,%.o,$(SOURCE))
 LIBS = $(OBJECTS)

@@ -384,7 +384,19 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
         return NULL;
     }
 
-    /* FIXME: Check if this is a zipped file */
+    /* Check that is is a PKZIP file (which happens to be the same as .npz format  */
+    char check[5] = { '\0' };
+    if( 4 != fread( check, 1, 4, fp )){
+        fprintf(stderr, "Warning cannot read from '%s'.\n" filename );
+        fclose( fp );
+        return NULL;
+    }
+
+    if( check[2] != 'P' || check[3] != 'K' ){
+        fclose(fp);   /* Failing silently is intentional. caller should handle this. */
+        return NULL;
+    }
+    
 
     cmatrix_t *_array[_MAX_ARRAY_LENGTH] = {NULL};
     int count = 0;
