@@ -19,8 +19,10 @@ void _read_local_fileheader( FILE *fp, local_file_header_t *lfh )
         fprintf(stderr, "Cannot read header.\n");
         return;
     }
-    if (*(uint32_t*)(header) != LOCAL_HEADER_SIGNATURE )
+    if (*(uint32_t*)(header) != LOCAL_HEADER_SIGNATURE ){
+        fprintf(stderr, "What?\n");
         return;
+    }
 
     /* We cannot assume the structure is "packed" we therefore assign one and one element */
     lfh->local_file_header_signature = *(uint32_t*)(header);      /*  4 bytes */    

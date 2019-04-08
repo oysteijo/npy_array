@@ -68,10 +68,10 @@ static void _header_from_cmatrix( const cmatrix_t *m,  char *buf, size_t *hlen )
      */
 #define HEADER_LEN 108
     /* WARNING: This code looks inocent and simple, but it was really a struggle. Do not touch unless you like pain! */
-    size_t len = sprintf(dict, "{'descr': '%c%c%c', 'fortran_order': %s, 'shape': (%s), }",
+    size_t len = sprintf(dict, "{'descr': '%c%c%zu', 'fortran_order': %s, 'shape': (%s), }",
             m->endianness,
             m->typechar,
-            (char) m->elem_size + '0',
+            m->elem_size,
             m->fortran_order ? "True": "False",
             shape );
 
@@ -293,8 +293,9 @@ static cmatrix_t * _read_matrix( FILE *fp )
 
     /* FIXME Potential bug: Is the typechar always one byte? */
     m->typechar = descr[1];
-    /* FIXME Potential bug: Is the elem_size always one digit only? */
-    m->elem_size = descr[2] - '0';
+
+    /* FIXME: Check the **endptr (second argument which is still NULL here)*/
+    m->elem_size = (size_t) strtoll( &descr[2], NULL, 10);
     assert( m->elem_size > 0 );
 
 #if VERBOSE
@@ -387,17 +388,16 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
     /* Check that is is a PKZIP file (which happens to be the same as .npz format  */
     char check[5] = { '\0' };
     if( 4 != fread( check, 1, 4, fp )){
-        fprintf(stderr, "Warning cannot read from '%s'.\n" filename );
+        fprintf(stderr, "Warning: cannot read from '%s'.\n", filename );
         fclose( fp );
         return NULL;
     }
 
-    if( check[2] != 'P' || check[3] != 'K' ){
+    if( check[0] != 'P' || check[1] != 'K' ){
         fclose(fp);   /* Failing silently is intentional. caller should handle this. */
         return NULL;
     }
     
-
     cmatrix_t *_array[_MAX_ARRAY_LENGTH] = {NULL};
     int count = 0;
 
