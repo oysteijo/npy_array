@@ -397,6 +397,7 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
         fclose(fp);   /* Failing silently is intentional. caller should handle this. */
         return NULL;
     }
+    fseek( fp, -4, SEEK_CUR );
     
     cmatrix_t *_array[_MAX_ARRAY_LENGTH] = {NULL};
     int count = 0;
@@ -405,12 +406,13 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
 
         local_file_header_t lh;
         _read_local_fileheader( fp, &lh );
-        free( lh.file_name );    /* Oh!  Barf... */
-        free( lh.extra_field );
+        if (count == 2 ) break;
 #if VERBOSE
         printf("HEADER: %d\n", count);
         _dump_local_fileheader( &lh );
 #endif
+        free( lh.file_name );    /* Oh!  Barf... */
+        free( lh.extra_field );
         /* FIXME: Support for compressed files */
         if( lh.compression_method != 0 ){
             fprintf(stderr, "local file '%s' is compressed. Skipping.\n", lh.file_name);

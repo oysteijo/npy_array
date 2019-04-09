@@ -5,7 +5,7 @@
 
 #define CALLOC_READ_AND_CHECK(subject,length) \
     subject = calloc( length + 1, sizeof(char)); \
-    assert( subject ); \
+    assert( subject );  \
     chk = fread( subject, sizeof(char), length, fp ); \
     assert( chk == length );  \
     subject[length] = '\0';
