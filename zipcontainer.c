@@ -10,18 +10,18 @@
     assert( chk == length );  \
     subject[length] = '\0';
 
-void _read_local_fileheader( FILE *fp, local_file_header_t *lfh )
+int _read_local_fileheader( FILE *fp, local_file_header_t *lfh )
 {
 
     char header[LOCAL_HEADER_LENGTH];
     size_t chk = fread( header, 1, LOCAL_HEADER_LENGTH, fp ); /* FIXME */
     if (chk != LOCAL_HEADER_LENGTH ){
         fprintf(stderr, "Cannot read header.\n");
-        return;
+        return -1;
     }
     if (*(uint32_t*)(header) != LOCAL_HEADER_SIGNATURE ){
-        fprintf(stderr, "What?\n");
-        return;
+        fseek( fp, -LOCAL_HEADER_LENGTH, SEEK_CUR );
+        return -1;
     }
 
     /* We cannot assume the structure is "packed" we therefore assign one and one element */
@@ -39,6 +39,7 @@ void _read_local_fileheader( FILE *fp, local_file_header_t *lfh )
 
     CALLOC_READ_AND_CHECK(lfh->file_name, lfh->file_name_length);
     CALLOC_READ_AND_CHECK(lfh->extra_field, lfh->extra_field_length);
+    return 0;
 }
 
 void _read_central_directory_fileheader( FILE *fp, central_directory_header_t *cdh )

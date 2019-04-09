@@ -309,6 +309,7 @@ static cmatrix_t * _read_matrix( FILE *fp )
     printf("each item is %d bytes.\n", (int) m->elem_size );
 #endif
 
+    /* FIXME: This only works if there is one and only one leading spaces. */
     char *fortran = find_header_item("'fortran_order': ", header);
     assert( fortran );
 
@@ -320,6 +321,7 @@ static cmatrix_t * _read_matrix( FILE *fp )
         fprintf(stderr, "Warning: No matrix order found, assuming fortran_order=False");
 
 
+    /* FIXME: This only works if there is one and only one leading spaces. */
     char *shape   = find_header_item("'shape': ", header);
     assert(shape);
     while (*shape != ')' ) {
@@ -398,15 +400,16 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
         return NULL;
     }
     fseek( fp, -4, SEEK_CUR );
+    /* The check ends here */
     
     cmatrix_t *_array[_MAX_ARRAY_LENGTH] = {NULL};
     int count = 0;
 
     while ( true ){
-
         local_file_header_t lh;
-        _read_local_fileheader( fp, &lh );
-        if (count == 2 ) break;
+        if(0 != _read_local_fileheader( fp, &lh ))
+            break;
+
 #if VERBOSE
         printf("HEADER: %d\n", count);
         _dump_local_fileheader( &lh );
@@ -445,8 +448,6 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
 #if I_REALLY_DONT_CARE_ABOUT_THIS_SINCE_IVE_ALREADY_READ_ALL_THE_DATA_I_NEED
     /* FIXME: Read all the central directory */
     central_directory_header_t cdh;
-    /* OK reading a local header failed, so we have to go back some bytes */
-    fseek( fp, -LOCAL_HEADER_LENGTH, SEEK_CUR );
     for (int i = 0;  i < count; i++ ){
         _read_central_directory_header( fp, &cdh );
         printf("=== Central directory header %d ===\n", i);

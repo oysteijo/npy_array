@@ -102,7 +102,7 @@ typedef struct _end_of_central_dir_t
     char *   ZIP_file_comment;                /*  (variable size) */
 } end_of_central_dir_t;
 
-void _read_local_fileheader             ( FILE *fp, local_file_header_t *lfh );
+int  _read_local_fileheader             ( FILE *fp, local_file_header_t *lfh );
 void _read_central_directory_fileheader ( FILE *fp, central_directory_header_t *cdh );
 void _read_end_of_central_dir           ( FILE *fp, end_of_central_dir_t *eocd );
 

@@ -10,6 +10,9 @@ writing. There is not even methods to set and get elements of the array.
 The idea is that you can use `cblas` or something similar for the matrix
 operations. I therefore have no intentions of adding such features.
 
+I wrote this to be able to pass Keras saved neural network weight into a format
+that can be opened in a C implementd neural network.
+
 Credit should also go to Just Jordi Castells, and [his blogpost](http://jcastellssala.com/2014/02/01/npy-in-c/),
 which inspired me to write this.
 
@@ -61,14 +64,18 @@ You can the run example with a numpy file as argument.
     }
 
 ## Compilation/Install
-There is only one object file: `c_npy.o`
-This will be compiled if you type `make`. The object file can be statically linked
-in to your executable. (Well... crc and dostime has been added)
+There is only one object file: `c_npy.o` if you only want single `.npy` file.
+If you need reading and writing of `.npz` files, you need to compile the other files as well.
+This will be compiled if you type `make`, however this is really primitive. The object files
+can be statically linked in to your executable. TODO: Make a lib archive.
 
 ## Status
-This is written in a full hurry one afternoon. There is not much tested
-performed, and you can read the code to see what is does. when something
-goes wrong. All errors are written to STDERR. Consider this alpha.
+This is written in a full hurry one afternoon, and then modified over some time.
+There isn't much of testing performed, and you can read the code to see what is does.
+All errors are written to STDERR. Consider this alpha. So, reading and writing of
+both `.npy` and `.npz` files seems to work OK -- some obvious bugs of course -- however
+there is still no support for `np.savez_compressed()` saved arrays, nor support for saving
+such files. (I guess I need to use MiniZip (from zlib) for that, and that creates a dependency.)
 
 ## TODO
  * Bugfixes
@@ -76,4 +83,5 @@ goes wrong. All errors are written to STDERR. Consider this alpha.
  * Cleanup
  * Refactorisation
  * Nicer install/make a dynamic library or at least an archive lib.
+
 
