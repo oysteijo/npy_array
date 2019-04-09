@@ -64,10 +64,18 @@ You can the run example with a numpy file as argument.
     }
 
 ## Compilation/Install
-There is only one object file: `c_npy.o` if you only want single `.npy` file.
-If you need reading and writing of `.npz` files, you need to compile the other files as well.
-This will be compiled if you type `make`, however this is really primitive. The object files
-can be statically linked in to your executable. TODO: Make a lib archive.
+There is now a simple simple autoconf/automake setup. From scratch:
+
+    aclocal
+    autoconf
+    automake --add-missing
+    
+    ./configure
+    make
+
+This will build a static library `libc_npy.a` which can be linked in to your executable
+with the `-lc_npy` option to the linker. Since this is such alpha stage, I do not
+recommend to install this.
 
 ## Status
 This is written in a full hurry one afternoon, and then modified over some time.
