@@ -135,7 +135,7 @@ static void _write_matrix( FILE *fp, const cmatrix_t *m )
     return;
 }
 
-int c_npy_matrix_array_write( const char *filename, const cmatrix_t **array )
+int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
 {
     FILE *fp = fopen( filename, "wb" );
     if ( !fp ){
@@ -490,7 +490,7 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
 }
 
 
-size_t c_npy_matrix_array_length( const cmatrix_t **arr)
+size_t c_npy_matrix_array_length( cmatrix_t * const *arr)
 {
     if (!arr) return 0;
     size_t len = 0;
@@ -501,7 +501,7 @@ size_t c_npy_matrix_array_length( const cmatrix_t **arr)
 
 void c_npy_matrix_array_free( cmatrix_t **arr )
 {
-    size_t len = c_npy_matrix_array_length( (const cmatrix_t**) arr );
+    size_t len = c_npy_matrix_array_length( arr );
 
     for( unsigned int i = 0; i < len; i++)
         c_npy_matrix_free( arr[i] );
