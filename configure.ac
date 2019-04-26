@@ -1,6 +1,0 @@
-AC_INIT([c_npy], [0.1], [oysteijo@gmail.com])
-AM_INIT_AUTOMAKE
-AC_PROG_CC_C99
-AC_PROG_RANLIB
-AC_CONFIG_FILES([Makefile])
-AC_OUTPUT

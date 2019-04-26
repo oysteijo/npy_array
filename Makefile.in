@@ -1,0 +1,42 @@
+
+CC     = gcc
+CFLAGS = -std=c99 -Wall -Wextra -O3 $(dbg) $(profile)
+
+src = $(wildcard *.c)
+obj = $(src:.c=.o)
+dep = $(obj:.o=.d)  # one dependency file for each source
+
+LDFLAGS = $(profile) 
+
+alib = libc_npy.a
+
+$(alib): $(obj)
+	$(AR) rcs $@ $^
+
+-include $(dep)   # include all dep files in the makefile
+
+# rule to generate a dep file by using the C preprocessor
+# (see man cpp for details on the -MM and -MT options)
+%.d: %.c
+	@$(CPP) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
+
+.PHONY: clean
+clean:
+	$(RM) $(obj) $(alib)
+
+.PHONY: cleandep
+cleandep:
+	$(RM) $(dep)
+
+.PHONY: install
+install: $(alib)
+	mkdir -p $(DESTDIR)$(PREFIX)/lib
+	mkdir -p $(DESTDIR)$(PREFIX)/include
+	cp $(alib) $(DESTDIR)$(PREFIX)/lib/$(alib)
+	cp c_npy.h $(DESTDIR)$(PREFIX)/include/
+
+.PHONY: uninstall
+uninstall:
+	$(RM) $(DESTDIR)$(PREFIX)/lib/$(alib)
+	$(RM) $(DESTDIR)$(PREFIX)/include/c_npy.h
+
