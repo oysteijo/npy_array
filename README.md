@@ -11,7 +11,7 @@ The idea is that you can use `cblas` or something similar for the matrix
 operations. I therefore have no intentions of adding such features.
 
 I wrote this to be able to pass Keras saved neural network weight into a format
-that can be opened in a C implementd neural network.
+that can be opened in a C implemented neural network.
 
 Credit should also go to Just Jordi Castells, and [his blogpost](http://jcastellssala.com/2014/02/01/npy-in-c/),
 which inspired me to write this.
@@ -31,7 +31,7 @@ The structure is pretty self explanatory.
     } cmatrix_t;
 
 ## API
-The API is really simple. There is only seven functions:
+The API is really simple. There is only eight public functions:
 
     cmatrix_t * c_npy_matrix_read_file  ( const char *filename);
     void        c_npy_matrix_dump       ( const cmatrix_t *m );
@@ -40,8 +40,8 @@ The API is really simple. There is only seven functions:
 
     /* Reading an array of matrices from a .npz file. */
     cmatrix_t ** c_npy_matrix_array_read  ( const char *filename );
-    int          c_npy_matrix_array_write ( const char *filename, const cmatrix_t **array );
-    size_t       c_npy_matrix_array_length( const cmatrix_t **arr);
+    int          c_npy_matrix_array_write ( const char *filename, const cmatrix_t * const *array );
+    size_t       c_npy_matrix_array_length( const cmatrix_t * const *arr);
     void         c_npy_matrix_array_free  ( cmatrix_t **arr );
 
 ## Example usage.
@@ -64,12 +64,8 @@ You can the run example with a numpy file as argument.
     }
 
 ## Compilation/Install
-There is now a simple simple autoconf/automake setup. From scratch:
+There is now a simple configure file provided (NOT autoconf/automake generated). From scratch:
 
-    aclocal
-    autoconf
-    automake --add-missing
-    
     ./configure
     make
 
@@ -90,6 +86,4 @@ such files. (I guess I need to use MiniZip (from zlib) for that, and that create
  * Documentation
  * Cleanup
  * Refactorisation
- * Nicer install/make a dynamic library or at least an archive lib.
-
-
+ 
