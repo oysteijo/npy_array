@@ -8,7 +8,7 @@ int main(int argc, char *argv[])
     }
 
     cmatrix_t **arr = c_npy_matrix_array_read( argv[1] );
-    size_t len = c_npy_matrix_array_length( (const cmatrix_t**) arr );
+    size_t len = c_npy_matrix_array_length( arr );
     printf("Length: %d\n", (int) len );
     if( len == 0 ){
         /* This is possibly a matrix stored with 'save' instead of 'savez' */
@@ -32,7 +32,7 @@ int main(int argc, char *argv[])
     }
 
 
-    c_npy_matrix_array_write( "written_array.npz", (const cmatrix_t **) arr);
+    c_npy_matrix_array_write( "written_array.npz", arr);
     c_npy_matrix_array_free( arr );
     return 0;
 }

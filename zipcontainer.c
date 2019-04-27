@@ -1,14 +1,17 @@
 #include "zipcontainer.h"
 #include <stdio.h>
+#include <string.h>
 #include <stdlib.h>
 #include <assert.h>
 
-#define CALLOC_READ_AND_CHECK(subject,length) \
-    subject = calloc( length + 1, sizeof(char)); \
-    assert( subject );  \
-    chk = fread( subject, sizeof(char), length, fp ); \
-    assert( chk == length );  \
-    subject[length] = '\0';
+#define READ_VARIABLE_LEN_FIELD(subject,max_count) \
+    do { \
+        char tempstr[subject ## _length+1];  \
+        size_t _chk = fread( tempstr, sizeof(char), subject ## _length, fp ); \
+        assert( _chk == subject ## _length ); \
+        strncpy( subject, tempstr, max_count-1 ); \
+        subject ## _length = strlen( subject ); \
+    } while(0);
 
 int _read_local_fileheader( FILE *fp, local_file_header_t *lfh )
 {
@@ -37,8 +40,8 @@ int _read_local_fileheader( FILE *fp, local_file_header_t *lfh )
     lfh->file_name_length            = *(uint16_t*)(header+26);   /*  2 bytes */
     lfh->extra_field_length          = *(uint16_t*)(header+28);   /*  2 bytes */
 
-    CALLOC_READ_AND_CHECK(lfh->file_name, lfh->file_name_length);
-    CALLOC_READ_AND_CHECK(lfh->extra_field, lfh->extra_field_length);
+    READ_VARIABLE_LEN_FIELD(lfh->file_name, MAX_FILENAME_LEN);
+    READ_VARIABLE_LEN_FIELD(lfh->extra_field, MAX_EXTRAFIEALD_LEN);
     return 0;
 }
 
@@ -73,9 +76,9 @@ void _read_central_directory_fileheader( FILE *fp, central_directory_header_t *c
     cdh->external_file_attributes        = *(uint32_t*)(buffer+38);  /*  4 bytes */
     cdh->relative_offset_of_local_header = *(uint32_t*)(buffer+42);  /*  4 bytes */
 
-    CALLOC_READ_AND_CHECK( cdh->file_name,cdh->file_name_length);
-    CALLOC_READ_AND_CHECK( cdh->extra_field, cdh->extra_field_length);
-    CALLOC_READ_AND_CHECK( cdh->file_comment, cdh->file_comment_length);
+    READ_VARIABLE_LEN_FIELD( cdh->file_name,MAX_FILENAME_LEN );
+    READ_VARIABLE_LEN_FIELD( cdh->extra_field, MAX_EXTRAFIEALD_LEN );
+    READ_VARIABLE_LEN_FIELD( cdh->file_comment, MAX_FILECOMMENT_LEN );
 }
 
 void _read_end_of_central_dir( FILE *fp, end_of_central_dir_t *eocd )
@@ -100,9 +103,9 @@ void _read_end_of_central_dir( FILE *fp, end_of_central_dir_t *eocd )
     eocd->offset_cd_wrt_disknum          = *(uint32_t*)(buffer+16);  /*  4 bytes */
     eocd->ZIP_file_comment_length        = *(uint16_t*)(buffer+20);  /*  2 bytes */
 
-    CALLOC_READ_AND_CHECK( eocd->ZIP_file_comment, eocd->ZIP_file_comment_length);
+    READ_VARIABLE_LEN_FIELD( eocd->ZIP_file_comment, MAX_ZIPFILECOMMENT_LEN );
 }
-#undef CALLOC_READ_AND_CHECK
+#undef READ_VARIABLE_LEN_FIELD
 
 /* I hate passing pointer to files in functions, but I've sone an exception here. */
 
@@ -120,8 +123,8 @@ void _write_local_fileheader( FILE *fp, const local_file_header_t *lf )
     fwrite( &lf->uncompressed_size,           sizeof(uint32_t), 1, fp) ;    /*  4 bytes */
     fwrite( &lf->file_name_length,            sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
     fwrite( &lf->extra_field_length,          sizeof(uint16_t), 1, fp) ;    /*  2 bytes */
-    fwrite(  lf->file_name,                   sizeof(char), lf->file_name_length, fp) ;    /*  4 bytes */
-    fwrite(  lf->extra_field,                 sizeof(char), lf->extra_field_length, fp) ;    /*  4 bytes */
+    fwrite(  lf->file_name,                   sizeof(char), lf->file_name_length, fp) ; 
+    fwrite(  lf->extra_field,                 sizeof(char), lf->extra_field_length, fp) ; 
 }
 
 void _write_cental_directory_fileheader( FILE *fp, const central_directory_header_t *cdh )

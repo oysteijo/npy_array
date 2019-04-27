@@ -147,7 +147,7 @@ int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
 
     for ( int i = 0; i < n; i++ ){
         /* Set the name of the file */
-        char arrname[42] = {'\0' };
+        char arrname[MAX_FILENAME_LEN] = {'\0' };
         sprintf( arrname, "arr_%d", i );
 
         /* Find the time */
@@ -166,8 +166,8 @@ int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
             .compressed_size             = size,                         /*  4 bytes */
             .uncompressed_size           = size,                         /*  4 bytes */
             .file_name_length            = strlen(arrname),              /*  2 bytes */
-            .file_name                   = arrname                       /*  (variable size) */
         };
+        strcpy( lfh.file_name, arrname );
         _write_local_fileheader( fp, &lfh );
         _write_matrix          ( fp, array[i] );
     }
@@ -176,7 +176,7 @@ int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
     uint32_t total_namelength = 0;
     for ( int i = 0; i < n; i++ ){
         /* central directory */
-        char arrname[42] = {'\0' };
+        char arrname[MAX_FILENAME_LEN] = {'\0' };
         sprintf( arrname, "arr_%d", i );
 
         /* Find the time */
@@ -197,9 +197,9 @@ int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
             .uncompressed_size             = size,                         /*  4 bytes */
             .external_file_attributes      = 0x1a40000,                    /*  Unix: -rw-r--r-- (644) */
             .file_name_length              = strlen(arrname),              /*  2 bytes */
-            .file_name                     = arrname,                      /*  (variable size) */
             .relative_offset_of_local_header = offset_count                /* 4 bytes */
         };
+        strcpy( cdh.file_name, arrname );
 
         _write_cental_directory_fileheader( fp, &cdh );
         offset_count += size + cdh.file_name_length + LOCAL_HEADER_LENGTH;
@@ -414,8 +414,6 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
         printf("HEADER: %d\n", count);
         _dump_local_fileheader( &lh );
 #endif
-        free( lh.file_name );    /* Oh!  Barf... */
-        free( lh.extra_field );
         /* FIXME: Support for compressed files */
         if( lh.compression_method != 0 ){
             fprintf(stderr, "local file '%s' is compressed. Skipping.\n", lh.file_name);
@@ -452,7 +450,7 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
         _read_central_directory_header( fp, &cdh );
         printf("=== Central directory header %d ===\n", i);
         _central_directory_header_dump( &cdh );
-#if 1
+#if 0
         free( cdh.file_name );
         free( cdh.file_comment );
         free( cdh.extra_field );    
@@ -461,7 +459,6 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
     end_of_central_dir_t eocd = {0};
     _read_end_of_central_dir( fp, &eocd );
     _dump_end_of_central_dir( &eocd );
-    free( eocd->ZIP_file_comment );
 #endif  /* I_REALLY_DONT_CARE_ABOUT_THIS_SINCE_IVE_ALREADY_READ_ALL_THE_DATA_I_NEED */
     /* size_t len = c_npy_matrix_array_length( _array ); */
     size_t len = count;
@@ -471,7 +468,7 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
         return NULL;
     }
 
-    cmatrix_t** retarray = calloc( len, sizeof *retarray);
+    cmatrix_t** retarray = calloc( len+1, sizeof *retarray); /* +1 for a terminating NULL */
     if( !retarray ){
         fprintf( stderr, "Cannot allocate memory for array of matrices.\n");
         for( unsigned int i = 0; i < len; i++)
@@ -483,8 +480,9 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
     for( unsigned int i = 0; i < len; i++ )
         retarray[i] = _array[i];
 
-    /* Here we put in a lot of checks! CRC32 among the tests */
+    retarray[len] = NULL;
 
+    /* Here we put in a lot of checks! CRC32 among the tests */
     fclose(fp);
     return retarray;
 }

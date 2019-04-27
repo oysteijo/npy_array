@@ -15,8 +15,14 @@
 #include <stdint.h>
 #include <stdbool.h>
 
+/* Adjust these lengths if necesarry. They are more or less abritary */
+#define MAX_FILENAME_LEN       30
+#define MAX_EXTRAFIEALD_LEN    30 
+#define MAX_FILECOMMENT_LEN    50
+#define MAX_ZIPFILECOMMENT_LEN 50
 
-#define LOCAL_HEADER_LENGTH 30
+
+#define LOCAL_HEADER_LENGTH 30  /* This is the length w/o file_name and extra_field */
 #define LOCAL_HEADER_SIGNATURE 0x04034b50
 typedef struct _local_file_header_t
 {
@@ -31,8 +37,8 @@ typedef struct _local_file_header_t
     uint32_t  uncompressed_size;              /*  4 bytes */
     uint16_t  file_name_length;               /*  2 bytes */
     uint16_t  extra_field_length;             /*  2 bytes */
-    char     *file_name;                      /*  (variable size) */
-    char     *extra_field;                    /*  (variable size) */
+    char      file_name[MAX_FILENAME_LEN];        /*  (variable size) */
+    char      extra_field[MAX_EXTRAFIEALD_LEN];   /*  (variable size) */
 } local_file_header_t;
 
 #if 0
@@ -70,9 +76,9 @@ typedef struct _central_directory_header_t
     uint32_t external_file_attributes;        /* 4 bytes */
     uint32_t relative_offset_of_local_header; /* 4 bytes */
 
-    char    *file_name;                       /*  (variable size) */
-    char    *extra_field;                     /*  (variable size) */
-    char    *file_comment;                    /*  (variable size) */
+    char    file_name[MAX_FILENAME_LEN];          /*  (variable size) */
+    char    extra_field[MAX_EXTRAFIEALD_LEN];     /*  (variable size) */
+    char    file_comment[MAX_FILECOMMENT_LEN];    /*  (variable size) */
 } central_directory_header_t;
 
 #if 0
@@ -99,9 +105,10 @@ typedef struct _end_of_central_dir_t
     uint32_t size_of_cd;                      /*  4 bytes */
     uint32_t offset_cd_wrt_disknum;           /*  4 bytes */
     uint16_t ZIP_file_comment_length;         /*  2 bytes */
-    char *   ZIP_file_comment;                /*  (variable size) */
+    char     ZIP_file_comment[MAX_ZIPFILECOMMENT_LEN];   /*  (variable size) */
 } end_of_central_dir_t;
 
+/* FIXME: Some of these functions should return a code (int) if things go wrong */
 int  _read_local_fileheader             ( FILE *fp, local_file_header_t *lfh );
 void _read_central_directory_fileheader ( FILE *fp, central_directory_header_t *cdh );
 void _read_end_of_central_dir           ( FILE *fp, end_of_central_dir_t *eocd );
