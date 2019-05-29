@@ -215,6 +215,7 @@ int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
     };
 
     _write_end_of_central_dir( fp, &eocd );
+    fclose( fp );
     return n;
 }
 
