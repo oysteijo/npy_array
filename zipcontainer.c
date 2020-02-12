@@ -4,27 +4,35 @@
 #include <stdlib.h>
 #include <assert.h>
 
-#define READ_VARIABLE_LEN_FIELD(subject,max_count) \
-    do { \
-        char tempstr[subject ## _length+1];  \
-        size_t _chk = fread( tempstr, sizeof(char), subject ## _length, fp ); \
-        assert( _chk == subject ## _length ); \
-        strncpy( subject, tempstr, max_count-1 ); \
-        subject ## _length = strlen( subject ); \
-    } while(0);
+local_file_header_t          *local_file_header_new();
+central_directory_header_t   *central_directory_header_new();
+end_of_central_dir_t         *end_of_central_dir_new();
 
-int _read_local_fileheader( FILE *fp, local_file_header_t *lfh )
+/* Argh! I cannot make this macro work properly!! Anyone got an idea? */
+#define READ_VARIABLE_LEN_FIELD(datastruct,field) \
+    do { \
+        size_t len = datastruct ##->## field ## _length; \
+        char *buf = malloc( (len + 1) * sizeof(char));\
+        size_t chk = fread( buf, len, sizeof(char), fp );\
+        if(chk != len) fprintf(stderr, "Incorrect read.\n");\
+        datastruct ## -> ## field = buf; \
+    } while(0); 
+
+local_file_header_t *local_file_header_new_from_fp( FILE *fp )
 {
+    local_file_header_t *lfh = local_file_header_new();
 
     char header[LOCAL_HEADER_LENGTH];
     size_t chk = fread( header, 1, LOCAL_HEADER_LENGTH, fp ); /* FIXME */
     if (chk != LOCAL_HEADER_LENGTH ){
         fprintf(stderr, "Cannot read header.\n");
-        return -1;
+        local_file_header_free( lfh );
+        return NULL;
     }
     if (*(uint32_t*)(header) != LOCAL_HEADER_SIGNATURE ){
         fseek( fp, -LOCAL_HEADER_LENGTH, SEEK_CUR );
-        return -1;
+        local_file_header_free( lfh );
+        return NULL;
     }
 
     /* We cannot assume the structure is "packed" we therefore assign one and one element */
@@ -40,23 +48,61 @@ int _read_local_fileheader( FILE *fp, local_file_header_t *lfh )
     lfh->file_name_length            = *(uint16_t*)(header+26);   /*  2 bytes */
     lfh->extra_field_length          = *(uint16_t*)(header+28);   /*  2 bytes */
 
-    READ_VARIABLE_LEN_FIELD(lfh->file_name, MAX_FILENAME_LEN);
-    READ_VARIABLE_LEN_FIELD(lfh->extra_field, MAX_EXTRAFIEALD_LEN);
-    return 0;
+    /* Argh! The macro doesn't work */
+    do { 
+        size_t len = lfh->file_name_length;
+        char *buf = malloc( (len + 1) * sizeof(char));
+        size_t chk = fread( buf, sizeof(char), len, fp );
+        if(chk != len ) fprintf(stderr, "%d != %d.\n", (int)chk, (int)len);
+        lfh->file_name = buf;
+    } while(0); 
+    do { 
+        size_t len = lfh->extra_field_length;
+        char *buf = malloc( (len + 1) * sizeof(char));
+        size_t chk = fread( buf, sizeof(char), len, fp );
+        if(chk != len) fprintf(stderr, "Incorrect read.\n");
+        lfh->extra_field = buf;
+    } while(0); 
+
+    return lfh;
 }
 
-void _read_central_directory_fileheader( FILE *fp, central_directory_header_t *cdh )
+void  local_file_header_free( local_file_header_t *p)
 {
+    if( !p ) return;
+    if( p->file_name ) free( p->file_name );
+    if( p->extra_field ) free( p->extra_field );
+    free( p );
+}
+
+local_file_header_t          *local_file_header_new()
+{
+    local_file_header_t *lfh = malloc( sizeof( local_file_header_t ));
+    assert( lfh );
+
+    lfh->file_name = NULL;
+    lfh->extra_field = NULL;
+    return lfh;
+}
+
+
+
+central_directory_header_t *  central_directory_header_new_from_fp( FILE *fp)
+{
+    central_directory_header_t *cdh = central_directory_header_new(); 
     /* FIXME: Do checks all reads and malloc. */
     char buffer[CENTRAL_DIRECTORY_HEADER_LENGTH];
     size_t chk = fread( buffer, 1, CENTRAL_DIRECTORY_HEADER_LENGTH, fp ); /* FIXME */
     if (chk != CENTRAL_DIRECTORY_HEADER_LENGTH ){
         fprintf(stderr, "Cannot read buffer.\n");
-        return;
+        central_directory_header_free( cdh );
+        return NULL;
     }
 
-    if (*(uint32_t*)(buffer) != CENTRAL_DIRECTORY_HEADER_SIGNATURE ) /* Whoops! */
-        return;
+    if (*(uint32_t*)(buffer) != CENTRAL_DIRECTORY_HEADER_SIGNATURE ){ /* Whoops! */
+        central_directory_header_free( cdh );
+        return NULL;   /* Discussion: Maybe we should rewind the filepointer, just to be nice? */
+    }
 
     cdh->central_file_header_signature   = *(uint32_t*)(buffer);     /*  4 bytes */
     cdh->version_made_by                 = *(uint32_t*)(buffer+4);   /*  2 bytes */
@@ -76,23 +122,68 @@ void _read_central_directory_fileheader( FILE *fp, central_directory_header_t *c
     cdh->external_file_attributes        = *(uint32_t*)(buffer+38);  /*  4 bytes */
     cdh->relative_offset_of_local_header = *(uint32_t*)(buffer+42);  /*  4 bytes */
 
-    READ_VARIABLE_LEN_FIELD( cdh->file_name,MAX_FILENAME_LEN );
-    READ_VARIABLE_LEN_FIELD( cdh->extra_field, MAX_EXTRAFIEALD_LEN );
-    READ_VARIABLE_LEN_FIELD( cdh->file_comment, MAX_FILECOMMENT_LEN );
+    /* Argh! The macro doesn't work */
+    do { 
+        size_t len = cdh->file_name_length;
+        char *buf = malloc( (len + 1) * sizeof(char));
+        size_t chk = fread( buf, sizeof(char), len, fp );
+        if(chk != len) fprintf(stderr, "Incorrect read.\n");
+        cdh->file_name = buf;
+    } while(0); 
+    do { 
+        size_t len = cdh->extra_field_length;
+        char *buf = malloc( (len + 1) * sizeof(char));
+        size_t chk = fread( buf, sizeof(char), len, fp );
+        if(chk != len) fprintf(stderr, "Incorrect read.\n");
+        cdh->extra_field = buf;
+    } while(0); 
+    do { 
+        size_t len = cdh->file_comment_length;
+        char *buf = malloc( (len + 1) * sizeof(char));
+        size_t chk = fread( buf, sizeof(char), len, fp );
+        if(chk != len) fprintf(stderr, "Incorrect read.\n");
+        cdh->file_comment = buf;
+    } while(0); 
+
+    return cdh;
 }
 
-void _read_end_of_central_dir( FILE *fp, end_of_central_dir_t *eocd )
+void  central_directory_header_free( central_directory_header_t *p)
 {
+    if( !p ) return;
+    if( p->file_name ) free( p->file_name );
+    if( p->extra_field ) free( p->extra_field );
+    if( p->file_comment ) free( p->file_comment );
+    free( p );
+}
+
+central_directory_header_t *central_directory_header_new()
+{
+    central_directory_header_t *cdh = malloc( sizeof( central_directory_header_t ));
+    assert( cdh );
+
+    cdh->file_name = NULL;
+    cdh->extra_field = NULL;
+    cdh->file_comment = NULL;
+    return cdh;
+}
+
+end_of_central_dir_t * end_of_central_dir_new_from_fp( FILE *fp )
+{
+    end_of_central_dir_t *eocd = end_of_central_dir_new(); 
     /* FIXME: Do checks all reads and malloc. */
     char buffer[END_OF_CENTRAL_DIR_LENGTH];
     size_t chk = fread( buffer, 1, END_OF_CENTRAL_DIR_LENGTH, fp ); /* FIXME */
     if (chk != END_OF_CENTRAL_DIR_LENGTH ){
         fprintf(stderr, "Cannot read buffer.\n");
-        return;
+        end_of_central_dir_free( eocd );
+        return NULL;
     }
 
-    if (*(uint32_t*)(buffer) != END_OF_CENTRAL_DIR_SIGNATURE ) /* Whoops! */
-        return;
+    if (*(uint32_t*)(buffer) != END_OF_CENTRAL_DIR_SIGNATURE ){ /* Whoops! */
+        end_of_central_dir_free( eocd );
+        return NULL;
+    }
 
     eocd->end_of_central_dir_signature   = *(uint32_t*)(buffer);     /*  4 bytes (END_OF_CENTRAL_DIR_SIGNATURE) */
     eocd->number_of_this_disk            = *(uint16_t*)(buffer+4);   /*  2 bytes */
@@ -103,11 +194,31 @@ void _read_end_of_central_dir( FILE *fp, end_of_central_dir_t *eocd )
     eocd->offset_cd_wrt_disknum          = *(uint32_t*)(buffer+16);  /*  4 bytes */
     eocd->ZIP_file_comment_length        = *(uint16_t*)(buffer+20);  /*  2 bytes */
 
-    READ_VARIABLE_LEN_FIELD( eocd->ZIP_file_comment, MAX_ZIPFILECOMMENT_LEN );
+    do { 
+        size_t len = eocd->ZIP_file_comment_length;
+        char *buf = malloc( (len + 1) * sizeof(char));
+        size_t chk = fread( buf, sizeof(char), len, fp );
+        if(chk != len) fprintf(stderr, "Incorrect read.\n");
+        eocd->ZIP_file_comment = buf;
+    } while(0); 
+    return eocd;
 }
-#undef READ_VARIABLE_LEN_FIELD
 
-/* I hate passing pointer to files in functions, but I've sone an exception here. */
+void  end_of_central_dir_free( end_of_central_dir_t *p)
+{
+    if( !p ) return;
+    if( p->ZIP_file_comment ) free( p->ZIP_file_comment );
+    free( p );
+}
+
+end_of_central_dir_t *end_of_central_dir_new()
+{
+    end_of_central_dir_t *eocd = malloc( sizeof( end_of_central_dir_t ));
+    assert( eocd );
+
+    eocd->ZIP_file_comment = NULL;
+    return eocd;
+}
 
 void _write_local_fileheader( FILE *fp, const local_file_header_t *lf )
 {

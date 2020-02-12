@@ -22,6 +22,8 @@
 #define C_NPY_SHAPE_BUFSIZE 512
 #define C_NPY_DICT_BUFSIZE 1024
 
+#define MAX_FILENAME_LEN 80
+
 /*
 typedef struct _cmatrix_t {
     char    *data;
@@ -167,7 +169,7 @@ int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
             .uncompressed_size           = size,                         /*  4 bytes */
             .file_name_length            = strlen(arrname),              /*  2 bytes */
         };
-        strcpy( lfh.file_name, arrname );
+        lfh.file_name = arrname;
         _write_local_fileheader( fp, &lfh );
         _write_matrix          ( fp, array[i] );
     }
@@ -199,7 +201,7 @@ int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
             .file_name_length              = strlen(arrname),              /*  2 bytes */
             .relative_offset_of_local_header = offset_count                /* 4 bytes */
         };
-        strcpy( cdh.file_name, arrname );
+        cdh.file_name = arrname;
 
         _write_cental_directory_fileheader( fp, &cdh );
         offset_count += size + cdh.file_name_length + LOCAL_HEADER_LENGTH;
@@ -407,29 +409,29 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
     int count = 0;
 
     while ( true ){
-        local_file_header_t lh;
-        if(0 != _read_local_fileheader( fp, &lh ))
+        local_file_header_t *lh;
+        if( NULL == ( lh = local_file_header_new_from_fp( fp )))
             break;
 
 #if VERBOSE
         printf("HEADER: %d\n", count);
-        _dump_local_fileheader( &lh );
+        _dump_local_fileheader( lh );
 #endif
         /* FIXME: Support for compressed files */
-        if( lh.compression_method != 0 ){
-            fprintf(stderr, "local file '%s' is compressed. Skipping.\n", lh.file_name);
+        if( lh->compression_method != 0 ){
+            fprintf(stderr, "local file '%s' is compressed. Skipping.\n", lh->file_name);
             fprintf(stderr, "Still no support for reading compressed files.\n"
                     "Please store numpy array with np.savez() instead of np.savez_compressed().\n");
             continue;
         }
 
         /* FIXME: Support for encrypted files */
-        if( is_encypted( lh.general_purpose_bit_flag )) {
-            fprintf(stderr, "local file '%s' is encrypted. Skipping.\n", lh.file_name);
+        if( is_encypted( lh->general_purpose_bit_flag )) {
+            fprintf(stderr, "local file '%s' is encrypted. Skipping.\n", lh->file_name);
             continue;
         }
 
-        if( lh.general_purpose_bit_flag & (uint16_t) 0x4 ){
+        if( lh->general_purpose_bit_flag & (uint16_t) 0x4 ){
             fprintf(stderr, "No support for streamed datafiles with data descriptor.\n");
             /* fread( ... ); */
             continue;
@@ -441,27 +443,16 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
             continue;
         }
 
+        local_file_header_free( lh );
+
         count++;
         assert( count < _MAX_ARRAY_LENGTH );
+
     }
-#if I_REALLY_DONT_CARE_ABOUT_THIS_SINCE_IVE_ALREADY_READ_ALL_THE_DATA_I_NEED
-    /* FIXME: Read all the central directory */
-    central_directory_header_t cdh;
-    for (int i = 0;  i < count; i++ ){
-        _read_central_directory_header( fp, &cdh );
-        printf("=== Central directory header %d ===\n", i);
-        _central_directory_header_dump( &cdh );
-#if 0
-        free( cdh.file_name );
-        free( cdh.file_comment );
-        free( cdh.extra_field );    
-#endif
-    }
-    end_of_central_dir_t eocd = {0};
-    _read_end_of_central_dir( fp, &eocd );
-    _dump_end_of_central_dir( &eocd );
-#endif  /* I_REALLY_DONT_CARE_ABOUT_THIS_SINCE_IVE_ALREADY_READ_ALL_THE_DATA_I_NEED */
-    /* size_t len = c_npy_matrix_array_length( _array ); */
+
+    /* Here I could read the Central directory items, however I really do not care as
+     * I already have all the data I need. Fuck the central directory!   */
+    
     size_t len = count;
     if( len == 0 ){
         /* What? Maybe this is not a a zip file */
@@ -487,7 +478,6 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
     fclose(fp);
     return retarray;
 }
-
 
 size_t c_npy_matrix_array_length( cmatrix_t * const *arr)
 {
