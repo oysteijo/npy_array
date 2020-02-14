@@ -1,4 +1,4 @@
-#include "c_npy.h"
+#include "npy_array.h"
 #include "zipcontainer.h"
 #include "crc32.h"
 #include "dostime.h"
@@ -8,54 +8,41 @@
 #include <ctype.h>
 #include <assert.h>
 
-#define C_NPY_MAGIC_STRING {0x93,'N','U','M','P','Y'}
-#define C_NPY_MAGIC_LENGTH 6
-#define C_NPY_VERSION_HEADER_LENGTH 4
-#define C_NPY_PREHEADER_LENGTH (C_NPY_MAGIC_LENGTH + C_NPY_VERSION_HEADER_LENGTH)
-#define C_NPY_MAJOR_VERSION_IDX 6
-#define C_NPY_MINOR_VERSION_IDX 7
+#define NPY_ARRAY_MAGIC_STRING {0x93,'N','U','M','P','Y'}
+#define NPY_ARRAY_MAGIC_LENGTH 6
+#define NPY_ARRAY_VERSION_HEADER_LENGTH 4
+#define NPY_ARRAY_PREHEADER_LENGTH (NPY_ARRAY_MAGIC_LENGTH + NPY_ARRAY_VERSION_HEADER_LENGTH)
+#define NPY_ARRAY_MAJOR_VERSION_IDX 6
+#define NPY_ARRAY_MINOR_VERSION_IDX 7
 
-#define C_NPY_HEADER_LENGTH 2
-#define C_NPY_HEADER_LENGTH_LOW_IDX 8
-#define C_NPY_HEADER_LENGTH_HIGH_IDX 9
+#define NPY_ARRAY_HEADER_LENGTH 2
+#define NPY_ARRAY_HEADER_LENGTH_LOW_IDX 8
+#define NPY_ARRAY_HEADER_LENGTH_HIGH_IDX 9
 
-#define C_NPY_SHAPE_BUFSIZE 512
-#define C_NPY_DICT_BUFSIZE 1024
+#define NPY_ARRAY_SHAPE_BUFSIZE 512
+#define NPY_ARRAY_DICT_BUFSIZE 1024
 
 #define MAX_FILENAME_LEN 80
 
-/*
-typedef struct _cmatrix_t {
-    char    *data;
-    size_t   shape[ C_NPY_MAX_DIMENSIONS ];
-    int32_t  ndim;
-    char     endianness;
-    char     typechar;
-    size_t   elem_size;
-    bool     fortran_order;
-} cmatrix_t;
-*/
-
-static void _header_from_cmatrix( const cmatrix_t *m,  char *buf, size_t *hlen )
+static void _header_from_npy_array( const npy_array_t *m,  char *buf, size_t *hlen )
 {
     char *p = buf;
 
-    static char magic[] = C_NPY_MAGIC_STRING;
-    memcpy( p, magic, C_NPY_MAGIC_LENGTH );
-    p += C_NPY_MAGIC_LENGTH;
+    static char magic[] = NPY_ARRAY_MAGIC_STRING;
+    memcpy( p, magic, NPY_ARRAY_MAGIC_LENGTH );
+    p += NPY_ARRAY_MAGIC_LENGTH;
 
-    static char version[C_NPY_HEADER_LENGTH] = { 1, 0 };
-    memcpy( p, version, C_NPY_HEADER_LENGTH );
-    p += C_NPY_HEADER_LENGTH;
+    static char version[NPY_ARRAY_HEADER_LENGTH] = { 1, 0 };
+    memcpy( p, version, NPY_ARRAY_HEADER_LENGTH );
+    p += NPY_ARRAY_HEADER_LENGTH;
 
-    char dict[C_NPY_DICT_BUFSIZE] = { '\0' };
-    char shape[C_NPY_SHAPE_BUFSIZE] = { '\0' };
+    char dict[NPY_ARRAY_DICT_BUFSIZE] = { '\0' };
+    char shape[NPY_ARRAY_SHAPE_BUFSIZE] = { '\0' };
     char *ptr = shape;
 
     for( int i = 0; i < m->ndim; i++)
         ptr += sprintf(ptr, "%d,", (int) m->shape[i]);
-    assert( ptr - shape < C_NPY_SHAPE_BUFSIZE );
-
+    assert( ptr - shape < NPY_ARRAY_SHAPE_BUFSIZE );
 
     /* Potential bug? There are some additional whitespaces after the dictionaries saved from
      * Python/Numpy. Those are not documented? I have tested that this dictionary actually works */
@@ -78,18 +65,18 @@ static void _header_from_cmatrix( const cmatrix_t *m,  char *buf, size_t *hlen )
             shape );
 
     assert( len < HEADER_LEN ); /* FIXME: This can go wrong for really big arrays with a lot of dimensions */
-    len += sprintf( dict + len, "%*s\n", (int) (HEADER_LEN - len + C_NPY_PREHEADER_LENGTH - 1), " " );
+    len += sprintf( dict + len, "%*s\n", (int) (HEADER_LEN - len + NPY_ARRAY_PREHEADER_LENGTH - 1), " " );
 
     const uint16_t _len = (uint16_t) (len);
     memcpy( p, &_len, sizeof(uint16_t));
     p += sizeof(uint16_t);
     memcpy( p, dict, len);
 
-    *hlen = len + C_NPY_PREHEADER_LENGTH;
+    *hlen = len + NPY_ARRAY_PREHEADER_LENGTH;
 #undef HEADER_LEN
 }
 
-static size_t _calculate_datasize( const cmatrix_t *m )
+static size_t _calculate_datasize( const npy_array_t *m )
 {
     size_t n_elements = 1;
     int idx = 0;
@@ -98,12 +85,12 @@ static size_t _calculate_datasize( const cmatrix_t *m )
     return n_elements * m->elem_size;
 }
 
-static uint32_t _crc32_from_cmatrix( const cmatrix_t *m, uint32_t *size )
+static uint32_t _crc32_from_npy_array( const npy_array_t *m, uint32_t *size )
 {
-    char header[C_NPY_DICT_BUFSIZE + C_NPY_PREHEADER_LENGTH] = {'\0'};
+    char header[NPY_ARRAY_DICT_BUFSIZE + NPY_ARRAY_PREHEADER_LENGTH] = {'\0'};
 
     size_t hlen = 0;
-    _header_from_cmatrix( m, header, &hlen );
+    _header_from_npy_array( m, header, &hlen );
     size_t datasize = _calculate_datasize( m );
     if(size) *size = hlen + datasize;
     uint32_t crc;
@@ -112,13 +99,13 @@ static uint32_t _crc32_from_cmatrix( const cmatrix_t *m, uint32_t *size )
 }
 
 /* FIXME: tell caller about the fails */
-static void _write_matrix( FILE *fp, const cmatrix_t *m )
+static void _write_matrix( FILE *fp, const npy_array_t *m )
 {
 
-    char header[C_NPY_DICT_BUFSIZE + C_NPY_PREHEADER_LENGTH] = {'\0'};
+    char header[NPY_ARRAY_DICT_BUFSIZE + NPY_ARRAY_PREHEADER_LENGTH] = {'\0'};
 
     size_t hlen = 0;
-    _header_from_cmatrix( m, header, &hlen );
+    _header_from_npy_array( m, header, &hlen );
 
     size_t chk = fwrite( header, sizeof(char), hlen, fp );
     if( chk != hlen){
@@ -137,27 +124,109 @@ static void _write_matrix( FILE *fp, const cmatrix_t *m )
     return;
 }
 
-int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
+static npy_array_list_t * npy_array_list_new()
 {
+    npy_array_list_t *list = malloc( sizeof(npy_array_list_t ));
+    if( !list )
+        return NULL; /* Whoops. */
+
+    list->array    = NULL;
+    list->filename = NULL;
+    list->crc32    = 0;
+    list->next     = NULL;
+    return list;
+}
+
+void npy_array_list_free( npy_array_list_t *list )
+{
+    if( !list )
+        return;
+    if( list->array )
+        npy_array_free( list->array );
+    if( list->filename )
+        free( list->filename );
+    if( list->next )
+        npy_array_list_free( list->next );
+    free( list );
+}
+
+/* strdup() is not ANSI C99. We have to roll our own!? */
+char *_local_strdup( const char *in )
+{
+    size_t len = strlen( in ) + 1;
+    char *retval = malloc( len * sizeof(char));
+    if(retval)
+        memcpy( retval, in, len);
+    return retval;
+}
+
+npy_array_list_t * npy_array_list_append( npy_array_list_t *list, npy_array_t *array, char *filename )
+{
+    npy_array_list_t *new_list;
+
+    new_list = npy_array_list_new();
+    if ( !new_list ) return list;
+    new_list->array = array;
+    new_list->filename = _local_strdup( filename );
+    new_list->crc32 = _crc32_from_npy_array ( array, NULL );
+    new_list->next = NULL;
+
+    if(list) {
+        npy_array_list_t *last = list;
+        while(last->next)
+            last = last->next;
+        last->next = new_list;
+        return list;
+    }
+    return new_list;
+}
+
+npy_array_list_t * npy_array_list_prepend( npy_array_list_t *list, npy_array_t *array, char *filename )
+{
+    npy_array_list_t *new_list;
+
+    new_list = npy_array_list_new();
+    if ( !new_list ) return list;
+    new_list->array = array;
+    new_list->filename = _local_strdup(filename);
+    new_list->crc32 = _crc32_from_npy_array ( array, NULL );
+    new_list->next = list;
+    return new_list;
+}
+
+static char * _new_internal_filename( int n )
+{
+    char *filename = malloc( MAX_FILENAME_LEN * sizeof(char) );
+    if( filename )
+        sprintf( filename, "arr_%d.npy", n );
+    return filename;
+}
+
+int npy_array_list_save( const char *filename, npy_array_list_t *array_list )
+{
+    if ( !array_list )
+        return 0;
+
     FILE *fp = fopen( filename, "wb" );
     if ( !fp ){
         fprintf(stderr, "Cannot open file '%s' for writing\n", filename);
         return -1;
     }
 
-    int n = (int) c_npy_matrix_array_length( array );
+    // int n = (int) npy_array_matrix_array_length( array );
+    int n = 0;
 
-    for ( int i = 0; i < n; i++ ){
+    for( npy_array_list_t *iter = array_list; iter; iter = iter->next ){
         /* Set the name of the file */
-        char arrname[MAX_FILENAME_LEN] = {'\0' };
-        sprintf( arrname, "arr_%d", i );
+        if(!iter->filename)
+            iter->filename = _new_internal_filename( n );
 
         /* Find the time */
         time_t now = time(NULL);
         dostime_t dt_now = unix2dostime( now );
 
         uint32_t size = 0;
-        uint32_t crc32 = _crc32_from_cmatrix( array[i], &size );
+        uint32_t crc32 = _crc32_from_npy_array( iter->array, &size );
 
         local_file_header_t lfh = {
             .local_file_header_signature = LOCAL_HEADER_SIGNATURE,                   /*  4 bytes  (LOCAL_HEADER_SIGNATURE) */
@@ -167,19 +236,18 @@ int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
             .crc_32                      = crc32,                        /*  4 bytes */
             .compressed_size             = size,                         /*  4 bytes */
             .uncompressed_size           = size,                         /*  4 bytes */
-            .file_name_length            = strlen(arrname),              /*  2 bytes */
+            .file_name_length            = strlen(iter->filename),       /*  2 bytes */
         };
-        lfh.file_name = arrname;
+        lfh.file_name = iter->filename;
         _write_local_fileheader( fp, &lfh );
-        _write_matrix          ( fp, array[i] );
+        _write_matrix          ( fp, iter->array );
+        n++;
     }
 
     uint32_t offset_count = 0;
     uint32_t total_namelength = 0;
-    for ( int i = 0; i < n; i++ ){
+    for( npy_array_list_t *iter = array_list; iter; iter = iter->next ){
         /* central directory */
-        char arrname[MAX_FILENAME_LEN] = {'\0' };
-        sprintf( arrname, "arr_%d", i );
 
         /* Find the time */
         /* OK ... the time might be different in CD than in local, but I guess that's not a problem? */
@@ -187,7 +255,7 @@ int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
         dostime_t dt_now = unix2dostime( now );
 
         uint32_t size;
-        uint32_t crc32 = _crc32_from_cmatrix( array[i], &size );
+        uint32_t crc32 = _crc32_from_npy_array( iter->array, &size );
         central_directory_header_t cdh = {
             .central_file_header_signature = CENTRAL_DIRECTORY_HEADER_SIGNATURE, /* 4 bytes */
             .version_made_by               = 788,        /* My python uses this. Should I use something else? */ /* 2 bytes */
@@ -198,10 +266,10 @@ int c_npy_matrix_array_write( const char *filename, cmatrix_t * const *array )
             .compressed_size               = size,                         /*  4 bytes */
             .uncompressed_size             = size,                         /*  4 bytes */
             .external_file_attributes      = 0x1a40000,                    /*  Unix: -rw-r--r-- (644) */
-            .file_name_length              = strlen(arrname),              /*  2 bytes */
+            .file_name_length              = strlen(iter->filename),       /*  2 bytes */
             .relative_offset_of_local_header = offset_count                /* 4 bytes */
         };
-        cdh.file_name = arrname;
+        cdh.file_name = iter->filename;
 
         _write_cental_directory_fileheader( fp, &cdh );
         offset_count += size + cdh.file_name_length + LOCAL_HEADER_LENGTH;
@@ -238,23 +306,23 @@ static inline bool is_encypted( uint16_t flag )
     return flag & (uint16_t) 0x1;
 }
 
-static cmatrix_t * _read_matrix( FILE *fp )
+static npy_array_t * _read_matrix( FILE *fp )
 {
-    char fixed_header[C_NPY_PREHEADER_LENGTH + 1];
-    size_t chk = fread( fixed_header, sizeof(char), C_NPY_PREHEADER_LENGTH, fp );
-    if( chk != C_NPY_PREHEADER_LENGTH ){
+    char fixed_header[NPY_ARRAY_PREHEADER_LENGTH + 1];
+    size_t chk = fread( fixed_header, sizeof(char), NPY_ARRAY_PREHEADER_LENGTH, fp );
+    if( chk != NPY_ARRAY_PREHEADER_LENGTH ){
         fprintf(stderr, "Cannot read pre header bytes.\n");
         return NULL;
     }
-    for( int i = 0; i < C_NPY_MAGIC_LENGTH; i++ ){
-        static char magic[] = C_NPY_MAGIC_STRING;
+    for( int i = 0; i < NPY_ARRAY_MAGIC_LENGTH; i++ ){
+        static char magic[] = NPY_ARRAY_MAGIC_STRING;
         if( magic[i] != fixed_header[i] ){
             fprintf(stderr,"File format not recognised as numpy array.\n");
             return NULL;
         }
     }
-    char major_version = fixed_header[C_NPY_MAJOR_VERSION_IDX];
-    char minor_version = fixed_header[C_NPY_MINOR_VERSION_IDX];
+    char major_version = fixed_header[NPY_ARRAY_MAJOR_VERSION_IDX];
+    char minor_version = fixed_header[NPY_ARRAY_MINOR_VERSION_IDX];
 
     if(major_version != 1){
         fprintf(stderr,"Wrong numpy save version. Expected version 1.x This is version %d.%d\n", (int)major_version, (int)minor_version);
@@ -263,8 +331,8 @@ static cmatrix_t * _read_matrix( FILE *fp )
 
     /* FIXME! This may fail for version 2 and it may also fail on big endian systems.... */
     uint16_t header_length = 0;
-    header_length |= fixed_header[C_NPY_HEADER_LENGTH_LOW_IDX];
-    header_length |= fixed_header[C_NPY_HEADER_LENGTH_HIGH_IDX] << 8;   /* Is a byte always 8 bit? */
+    header_length |= fixed_header[NPY_ARRAY_HEADER_LENGTH_LOW_IDX];
+    header_length |= fixed_header[NPY_ARRAY_HEADER_LENGTH_HIGH_IDX] << 8;   /* Is a byte always 8 bit? */
     
     char header[header_length + 1];
     chk = fread( header, sizeof(char), header_length, fp );
@@ -277,7 +345,7 @@ static cmatrix_t * _read_matrix( FILE *fp )
     printf("Header length: %d\nHeader dictionary: \"%s\"\n", header_length, header);
 #endif
 
-    cmatrix_t *m = calloc( 1, sizeof *m );
+    npy_array_t *m = calloc( 1, sizeof *m );
     if ( !m ){
         fprintf(stderr, "Cannot allocate memory dor matrix structure.\n");
         return NULL;
@@ -301,7 +369,7 @@ static cmatrix_t * _read_matrix( FILE *fp )
     m->elem_size = (size_t) strtoll( &descr[2], NULL, 10);
     assert( m->elem_size > 0 );
 
-#if VERBOSE
+#if 0
     if(descr[0] == '<') printf("Little Endian\n");
     if(descr[0] == '>') printf("Big Endian (Be carefull)\n");
     if(descr[0] == '|') printf("Not relevant endianess\n");
@@ -334,7 +402,7 @@ static cmatrix_t * _read_matrix( FILE *fp )
         }
         m->shape[m->ndim] = strtol( shape, &shape, 10);
         m->ndim++;
-        assert( m->ndim < C_NPY_MAX_DIMENSIONS );
+        assert( m->ndim < NPY_ARRAY_MAX_DIMENSIONS );
     }
 
     size_t n_elements = 1;
@@ -364,7 +432,7 @@ static cmatrix_t * _read_matrix( FILE *fp )
     return m;
 }
 
-cmatrix_t * c_npy_matrix_read_file( const char *filename )
+npy_array_t * npy_array_load( const char *filename )
 {
     FILE *fp = fopen(filename, "rb");
     if( !fp ){
@@ -373,7 +441,7 @@ cmatrix_t * c_npy_matrix_read_file( const char *filename )
         return NULL;
     }
 
-    cmatrix_t *m = _read_matrix( fp );
+    npy_array_t *m = _read_matrix( fp );
     if(!m) { fprintf(stderr, "Cannot read matrix.\n"); }
 
     fclose(fp);
@@ -381,7 +449,7 @@ cmatrix_t * c_npy_matrix_read_file( const char *filename )
 }
 
 #define _MAX_ARRAY_LENGTH 128
-cmatrix_t ** c_npy_matrix_array_read( const char *filename )
+npy_array_list_t * npy_array_list_load( const char *filename )
 {
     FILE *fp = fopen(filename, "rb");
     if( !fp ){
@@ -389,6 +457,8 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
         perror("Error");
         return NULL;
     }
+
+    npy_array_list_t *list = NULL;
 
     /* Check that is is a PKZIP file (which happens to be the same as .npz format  */
     char check[5] = { '\0' };
@@ -405,18 +475,11 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
     fseek( fp, -4, SEEK_CUR );
     /* The check ends here */
     
-    cmatrix_t *_array[_MAX_ARRAY_LENGTH] = {NULL};
-    int count = 0;
-
     while ( true ){
         local_file_header_t *lh;
         if( NULL == ( lh = local_file_header_new_from_fp( fp )))
             break;
 
-#if VERBOSE
-        printf("HEADER: %d\n", count);
-        _dump_local_fileheader( lh );
-#endif
         /* FIXME: Support for compressed files */
         if( lh->compression_method != 0 ){
             fprintf(stderr, "local file '%s' is compressed. Skipping.\n", lh->file_name);
@@ -438,66 +501,37 @@ cmatrix_t ** c_npy_matrix_array_read( const char *filename )
         }
 
         /* done reading header - read the matrix */
-        if( NULL == (_array[count] = _read_matrix( fp ))){
+        npy_array_t *a = _read_matrix( fp );
+        if( !a ){
             fprintf(stderr, "Cannot read matrix.\n");
             continue;
         }
-
+        list = npy_array_list_append( list, a, lh->file_name );
+        _dump_local_fileheader( lh );
         local_file_header_free( lh );
-
-        count++;
-        assert( count < _MAX_ARRAY_LENGTH );
-
     }
 
     /* Here I could read the Central directory items, however I really do not care as
      * I already have all the data I need. Fuck the central directory!   */
-    
-    size_t len = count;
-    if( len == 0 ){
-        /* What? Maybe this is not a a zip file */
-        fclose(fp);
-        return NULL;
-    }
-
-    cmatrix_t** retarray = calloc( len+1, sizeof *retarray); /* +1 for a terminating NULL */
-    if( !retarray ){
-        fprintf( stderr, "Cannot allocate memory for array of matrices.\n");
-        for( unsigned int i = 0; i < len; i++)
-            c_npy_matrix_free( _array[i] );
-        fclose( fp );
-        return NULL;
-    }
-    /* Copy the pointers */
-    for( unsigned int i = 0; i < len; i++ )
-        retarray[i] = _array[i];
-
-    retarray[len] = NULL;
-
-    /* Here we put in a lot of checks! CRC32 among the tests */
-    fclose(fp);
-    return retarray;
+    fclose( fp );
+    return list;
 }
 
-size_t c_npy_matrix_array_length( cmatrix_t * const *arr)
+size_t npy_array_list_length( npy_array_list_t *arr)
 {
     if (!arr) return 0;
+
     size_t len = 0;
-    for( len = 0; len < _MAX_ARRAY_LENGTH && arr[len]; len++ )
-        ;
+    npy_array_list_t *iter = arr;
+
+    while( iter ){
+        len++;
+        iter = iter->next;
+    }
     return len;
 }
 
-void c_npy_matrix_array_free( cmatrix_t **arr )
-{
-    size_t len = c_npy_matrix_array_length( arr );
-
-    for( unsigned int i = 0; i < len; i++)
-        c_npy_matrix_free( arr[i] );
-    free( arr );
-}
-
-void c_npy_matrix_dump( const cmatrix_t *m )
+void npy_array_dump( const npy_array_t *m )
 {
     if(!m){
         fprintf(stderr, "Warning: No matrix found. (%s)\n", __func__);
@@ -513,8 +547,7 @@ void c_npy_matrix_dump( const cmatrix_t *m )
     return;
 }
 
-
-void c_npy_matrix_write_file( const char *filename, const cmatrix_t *m )
+void npy_array_save( const char *filename, const npy_array_t *m )
 {
     if( !m ){
         fprintf(stderr, "Warning: No matrix found. (%s)\n", __func__);
@@ -531,7 +564,7 @@ void c_npy_matrix_write_file( const char *filename, const cmatrix_t *m )
     fclose(fp);
 }
 
-void c_npy_matrix_free( cmatrix_t *m )
+void npy_array_free( npy_array_t *m )
 {
     if( !m ){
         fprintf(stderr, "Warning: No matrix found. (%s)\n", __func__);

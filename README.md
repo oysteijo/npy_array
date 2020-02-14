@@ -1,4 +1,4 @@
-# c_npy
+# npy_array
 
 A simple library for reading and writing numpy arrays in C code. It is independent
 of Python both compile time and runtime.
@@ -19,47 +19,47 @@ which inspired me to write this.
 ## The C structure
 The structure is pretty self explanatory.
 
-    #define C_NPY_MAX_DIMENSIONS 8
-    typedef struct _cmatrix_t {
+    #define NPY_ARRAY_MAX_DIMENSIONS 8
+    typedef struct _npy_array_t {
         char    *data;
-        size_t   shape[ C_NPY_MAX_DIMENSIONS ];
+        size_t   shape[ NPY_ARRAY_MAX_DIMENSIONS ];
         int32_t  ndim;
         char     endianness;
         char     typechar;
         size_t   elem_size;
         bool     fortran_order;
-    } cmatrix_t;
+    } npy_array_t;
 
 ## API
 The API is really simple. There is only eight public functions:
 
-    cmatrix_t * c_npy_matrix_read_file  ( const char *filename);
-    void        c_npy_matrix_dump       ( const cmatrix_t *m );
-    void        c_npy_matrix_write_file ( const char *filename, const cmatrix_t *m );
-    void        c_npy_matrix_free       ( cmatrix_t *m );
+    npy_array_t * npy_array_matrix_read_file  ( const char *filename);
+    void        npy_array_matrix_dump       ( const npy_array_t *m );
+    void        npy_array_matrix_write_file ( const char *filename, const npy_array_t *m );
+    void        npy_array_matrix_free       ( npy_array_t *m );
 
     /* Reading an array of matrices from a .npz file. */
-    cmatrix_t ** c_npy_matrix_array_read  ( const char *filename );
-    int          c_npy_matrix_array_write ( const char *filename, const cmatrix_t * const *array );
-    size_t       c_npy_matrix_array_length( const cmatrix_t * const *arr);
-    void         c_npy_matrix_array_free  ( cmatrix_t **arr );
+    npy_array_t ** npy_array_matrix_array_read  ( const char *filename );
+    int          npy_array_matrix_array_write ( const char *filename, const npy_array_t * const *array );
+    size_t       npy_array_matrix_array_length( const npy_array_t * const *arr);
+    void         npy_array_matrix_array_free  ( npy_array_t **arr );
 
 ## Example usage.
 Here is a really simple example. You can compile this with:
 
     gcc -std=gnu99 -Wall -Wextra -O3 -c example.c
-    gcc -o example example.o c_npy.o
+    gcc -o example example.o npy_array.o
 
 You can the run example with a numpy file as argument.
 
-    #include "c_npy.h"
+    #include "npy_array.h"
     int main(int argc, char *argv[])
     {
         if( argc != 2 ) return -1;
-        cmatrix_t *m = c_npy_matrix_read_file( argv[1] );
-        c_npy_matrix_dump( m );
-        c_npy_matrix_write_file( "tester_save.npy", m);
-        c_npy_matrix_free( m );
+        npy_array_t *m = npy_array_matrix_read_file( argv[1] );
+        npy_array_matrix_dump( m );
+        npy_array_matrix_write_file( "tester_save.npy", m);
+        npy_array_matrix_free( m );
         return 0;
     }
 
@@ -69,8 +69,8 @@ There is now a simple configure file provided (NOT autoconf/automake generated).
     ./configure
     make
 
-This will build a static library `libc_npy.a` which can be linked in to your executable
-with the `-lc_npy` option to the linker. Since this is such alpha stage, I do not
+This will build a static library `libnpy_array.a` which can be linked in to your executable
+with the `-lnpy_array` option to the linker. Since this is such alpha stage, I do not
 recommend to install this.
 
 ## Status

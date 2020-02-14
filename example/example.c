@@ -1,4 +1,4 @@
-#include "c_npy.h"
+#include "npy_array.h"
 #include <stdio.h>
 int main(int argc, char *argv[])
 {
@@ -7,32 +7,33 @@ int main(int argc, char *argv[])
         return -1;
     }
 
-    cmatrix_t **arr = c_npy_matrix_array_read( argv[1] );
-    size_t len = c_npy_matrix_array_length( arr );
+    npy_array_list_t *list = npy_array_list_load( argv[1] );
+    size_t len = npy_array_list_length( list );
     printf("Length: %d\n", (int) len );
     if( len == 0 ){
         /* This is possibly a matrix stored with 'save' instead of 'savez' */
-        cmatrix_t *arr = c_npy_matrix_read_file( argv[1] );
+        npy_array_t *arr = npy_array_load( argv[1] );
         if( !arr ){
             printf("nope! No array there!\n");
             return -1;
         }
 
-        c_npy_matrix_dump( arr );
-        c_npy_matrix_free( arr );
+        npy_array_dump( arr );
+        npy_array_free( arr );
         return 0;
     }
 
     printf("number of objects in file: %lu\n", len);
-    for (unsigned int i = 0; i < len; i++ ){
-        c_npy_matrix_dump( arr[i] );
-        char fn[40];
-        sprintf(fn, "written%d.npy", i);
-        c_npy_matrix_write_file( fn, arr[i] );
+    int filename_counter = 0;
+    for ( npy_array_list_t *iter = list; iter; iter = iter->next ){
+        npy_array_dump( iter->array );
+        char fn[30];
+        sprintf( fn, "array_%d.npy", filename_counter++ );
+        printf( "'%s'\n", iter->filename ? iter->filename : "(NULL)" );
+        npy_array_save( iter->filename ? iter->filename : fn , iter->array );
     }
 
-
-    c_npy_matrix_array_write( "written_array.npz", arr);
-    c_npy_matrix_array_free( arr );
+    npy_array_list_save( "written_array.npz", list);
+    npy_array_list_free( list );
     return 0;
 }
