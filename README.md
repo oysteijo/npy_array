@@ -16,6 +16,37 @@ that can be opened in a C implemented neural network.
 Credit should also go to Just Jordi Castells, and [his blogpost](http://jcastellssala.com/2014/02/01/npy-in-c/),
 which inspired me to write this.
 
+### Important message if you've used this library before 15th Feb 2020.
+I have made some changes huge changes to this library mid february 2020. The main
+data structure is renamed from `cmatrix_t` to `npy_array_t` to illistrate better that
+this is a numpy n-dimentional array that is available in C. The structures members
+are all the same when it comes to names and types.
+
+The API calls has been change to reflect the datastructure name change. All functions
+are renamed.
+
+| Old name               | New name       |
+|------------------------|----------------|
+| c_npy_matrix_read_file | npy_array_load |
+| c_npy_matrix_dump      | npy_array_dump |
+| c_npy_matrix_write_file| npy_array_save |
+| c_npy_matrix_free      | npy_array_free |
+
+The new names are shorter and more decriptive.
+
+The next big change is that loading `.npz` files no longer returns an array of pointers to
+npy_arrays. It will now return a special linked list structure of numpy arrays, `npy_array_list_t`.
+
+The API calls for `.npz`  has also been changed accoringly.
+
+| Old name                 | New name             |
+|--------------------------|----------------------|
+| c_npy_matrix_array_read  | npy_array_list_load  |
+| c_npy_matrix_array_write | npy_array_list_save  |
+| c_npy_matrix_array_length| npy_array_list_length|
+| c_npy_matrix_array_free  | npy_array_list_free  |
+
+
 ## The C structure
 The structure is pretty self explanatory.
 
@@ -30,19 +61,30 @@ The structure is pretty self explanatory.
         bool     fortran_order;
     } npy_array_t;
 
+And the linked list structure for `.npz` files:
+
+    typedef struct _npy_array_list_t {
+        npy_array_t      *array;
+        char             *filename;
+        uint32_t          crc32;
+        struct _npy_array_list_t *next;
+    } npy_array_list_t;
+
 ## API
-The API is really simple. There is only eight public functions:
+The API is really simple. There is only ten public functions:
 
-    npy_array_t * npy_array_matrix_read_file  ( const char *filename);
-    void        npy_array_matrix_dump       ( const npy_array_t *m );
-    void        npy_array_matrix_write_file ( const char *filename, const npy_array_t *m );
-    void        npy_array_matrix_free       ( npy_array_t *m );
-
-    /* Reading an array of matrices from a .npz file. */
-    npy_array_t ** npy_array_matrix_array_read  ( const char *filename );
-    int          npy_array_matrix_array_write ( const char *filename, const npy_array_t * const *array );
-    size_t       npy_array_matrix_array_length( const npy_array_t * const *arr);
-    void         npy_array_matrix_array_free  ( npy_array_t **arr );
+    npy_array_t*      npy_array_load        ( const char *filename);
+    void              npy_array_dump        ( const npy_array_t *m );
+    void              npy_array_save        ( const char *filename, const npy_array_t *m );
+    void              npy_array_free        ( npy_array_t *m );
+    
+    npy_array_list_t* npy_array_list_load   ( const char *filename );
+    int               npy_array_list_save   ( const char *filename, npy_array_list_t *array_list );
+    size_t            npy_array_list_length ( npy_array_list_t *array_list);
+    void              npy_array_list_free   ( npy_array_list_t *array_list);
+    
+    npy_array_list_t* npy_array_list_prepend( npy_array_list_t *list, npy_array_t *array, char *filename);
+    npy_array_list_t* npy_array_list_append ( npy_array_list_t *list, npy_array_t *array, char *filename);
 
 ## Example usage.
 Here is a really simple example. You can compile this with:

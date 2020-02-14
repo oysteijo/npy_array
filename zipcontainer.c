@@ -280,7 +280,7 @@ void _write_end_of_central_dir( FILE *fp, const end_of_central_dir_t *eocd )
 
 /* These functions are more or less for my debugging purposes */
 #ifndef NDEBUG
-void end_of_central_dir_dump( const end_of_central_dir_t *eocd )
+void _dump_end_of_central_dir( const end_of_central_dir_t *eocd )
 {
     printf("(%d) end_of_central_dir_signature\n",   eocd->end_of_central_dir_signature);
     printf("(%d) number_of_this_disk\n",            eocd->number_of_this_disk);
@@ -312,8 +312,8 @@ void _dump_central_directory_fileheader( const central_directory_header_t *cdh )
     printf("(%d) external_file_attributes\n", cdh->external_file_attributes);        /* 4 bytes */
     printf("(%d) relative_offset_of_local_header\n", cdh->relative_offset_of_local_header); /* 4 bytes */
 
-    printf("Filename: %s\n", cdh->file_name );
-    printf("Filecomment: %s\n", cdh->file_comment );
+    printf("Filename: %s\n", cdh->file_name ); /* Not NULL terminated, so this is a bug */
+    printf("Filecomment: %s\n", cdh->file_comment ); /* Not NULL terminated, so this is a bug */
 }
 
 void _dump_local_fileheader( const local_file_header_t *lfh)
@@ -330,7 +330,7 @@ void _dump_local_fileheader( const local_file_header_t *lfh)
     printf("file_name_length:            %d\n", lfh->file_name_length);
     printf("extra_field_length:          %d\n", lfh->extra_field_length);
 
-    printf("Filename: %s\n", lfh->file_name );
-    printf("Extra field: %s\n", lfh->extra_field );
+    printf("Filename: %s\n", lfh->file_name );      /* Not NULL terminated, so this is a bug */
+    printf("Extra field: %s\n", lfh->extra_field ); /* Not NULL terminated, so this is a bug */
 }
 #endif  /* not NDEBUG */

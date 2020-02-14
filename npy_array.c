@@ -150,14 +150,19 @@ void npy_array_list_free( npy_array_list_t *list )
     free( list );
 }
 
-/* strdup() is not ANSI C99. We have to roll our own!? */
-char *_local_strdup( const char *in )
+/* strndup() is not ANSI C99. We have to roll our own!? */
+static char * _local_strndup (const char *s, size_t n)
 {
-    size_t len = strlen( in ) + 1;
-    char *retval = malloc( len * sizeof(char));
-    if(retval)
-        memcpy( retval, in, len);
-    return retval;
+    const char *p = s;
+    while( n-- > 0 && *p )
+        p++;
+
+    size_t len = p - s;
+    char *retval = malloc (len + 1);
+    if (!retval)
+        return retval;
+    retval[len] = '\0';
+    return (char *) memcpy (retval, s, len);
 }
 
 npy_array_list_t * npy_array_list_append( npy_array_list_t *list, npy_array_t *array, char *filename )
@@ -167,7 +172,7 @@ npy_array_list_t * npy_array_list_append( npy_array_list_t *list, npy_array_t *a
     new_list = npy_array_list_new();
     if ( !new_list ) return list;
     new_list->array = array;
-    new_list->filename = _local_strdup( filename );
+    new_list->filename = filename;
     new_list->crc32 = _crc32_from_npy_array ( array, NULL );
     new_list->next = NULL;
 
@@ -188,7 +193,7 @@ npy_array_list_t * npy_array_list_prepend( npy_array_list_t *list, npy_array_t *
     new_list = npy_array_list_new();
     if ( !new_list ) return list;
     new_list->array = array;
-    new_list->filename = _local_strdup(filename);
+    new_list->filename = filename;
     new_list->crc32 = _crc32_from_npy_array ( array, NULL );
     new_list->next = list;
     return new_list;
@@ -506,8 +511,7 @@ npy_array_list_t * npy_array_list_load( const char *filename )
             fprintf(stderr, "Cannot read matrix.\n");
             continue;
         }
-        list = npy_array_list_append( list, a, lh->file_name );
-        _dump_local_fileheader( lh );
+        list = npy_array_list_append( list, a, _local_strndup( lh->file_name, lh->file_name_length));
         local_file_header_free( lh );
     }
 
