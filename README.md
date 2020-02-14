@@ -18,11 +18,11 @@ which inspired me to write this.
 
 ### Important message if you've used this library before 15th Feb 2020.
 I have made some changes huge changes to this library mid february 2020. The main
-data structure is renamed from `cmatrix_t` to `npy_array_t` to illistrate better that
+data structure is renamed from `cmatrix_t` to `npy_array_t` to illustrate better that
 this is a numpy n-dimentional array that is available in C. The structures members
 are all the same when it comes to names and types.
 
-The API calls has been change to reflect the datastructure name change. All functions
+The API calls has been changed to reflect the data structure name change. All functions
 are renamed.
 
 | Old name               | New name       |
@@ -98,10 +98,10 @@ You can the run example with a numpy file as argument.
     int main(int argc, char *argv[])
     {
         if( argc != 2 ) return -1;
-        npy_array_t *m = npy_array_matrix_read_file( argv[1] );
-        npy_array_matrix_dump( m );
-        npy_array_matrix_write_file( "tester_save.npy", m);
-        npy_array_matrix_free( m );
+        npy_array_t *m = npy_array_load( argv[1] );
+        npy_array_dump( m );
+        npy_array_save( "tester_save.npy", m);
+        npy_array_free( m );
         return 0;
     }
 
