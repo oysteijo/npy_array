@@ -8,7 +8,7 @@ dep = $(obj:.o=.d)  # one dependency file for each source
 
 LDFLAGS = $(profile) 
 
-alib = libc_npy.a
+alib = libnpy_array.a
 
 $(alib): $(obj)
 	$(AR) rcs $@ $^
@@ -33,10 +33,10 @@ install: $(alib)
 	mkdir -p $(DESTDIR)$(PREFIX)/lib
 	mkdir -p $(DESTDIR)$(PREFIX)/include
 	cp $(alib) $(DESTDIR)$(PREFIX)/lib/$(alib)
-	cp c_npy.h $(DESTDIR)$(PREFIX)/include/
+	cp npy_array.h $(DESTDIR)$(PREFIX)/include/
 
 .PHONY: uninstall
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/lib/$(alib)
-	$(RM) $(DESTDIR)$(PREFIX)/include/c_npy.h
+	$(RM) $(DESTDIR)$(PREFIX)/include/npy_array.h
 
