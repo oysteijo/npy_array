@@ -7,6 +7,7 @@
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
+#include <stdarg.h>
 
 #define NPY_ARRAY_MAGIC_STRING {0x93,'N','U','M','P','Y'}
 #define NPY_ARRAY_MAGIC_LENGTH 6
@@ -150,29 +151,38 @@ void npy_array_list_free( npy_array_list_t *list )
     free( list );
 }
 
-/* strndup() is not ANSI C99. We have to roll our own!? */
-static char * _local_strndup (const char *s, size_t n)
+npy_array_list_t * npy_array_list_append( npy_array_list_t *list, npy_array_t *array, const char *filename, ... )
 {
-    const char *p = s;
-    while( n-- > 0 && *p )
-        p++;
+    /* First get the full filename */
+    va_list ap1, ap2;
+    int len;
 
-    size_t len = p - s;
-    char *retval = malloc (len + 1);
-    if (!retval)
-        return retval;
-    retval[len] = '\0';
-    return (char *) memcpy (retval, s, len);
-}
+    va_start( ap1, filename );
+    va_copy( ap2, ap1 );
+    len = vsnprintf( NULL, 0, filename, ap1 );
+    va_end( ap1 );
 
-npy_array_list_t * npy_array_list_append( npy_array_list_t *list, npy_array_t *array, char *filename )
-{
+    if( len > MAX_FILENAME_LEN ){
+        /* If someone is trying to cook up a special filename that can contain executable code, I think it is wise
+           to limit the length of the filename */
+        fprintf( stderr, "Warning: Cannot save neural network. Your filename is too long."
+                " Please limit the filename to %d characters.\n", MAX_FILENAME_LEN );
+        return list;
+    }
+
+    char *real_filename = malloc( (len+1) * sizeof(char));
+    assert( real_filename );
+
+    vsprintf( real_filename, filename, ap2 );
+    va_end( ap2 );
+
+    /* And then we append...  But we have to find the last element first */
     npy_array_list_t *new_list;
 
     new_list = npy_array_list_new();
     if ( !new_list ) return list;
     new_list->array = array;
-    new_list->filename = filename;
+    new_list->filename = real_filename;
     new_list->crc32 = _crc32_from_npy_array ( array, NULL );
     new_list->next = NULL;
 
@@ -186,14 +196,38 @@ npy_array_list_t * npy_array_list_append( npy_array_list_t *list, npy_array_t *a
     return new_list;
 }
 
-npy_array_list_t * npy_array_list_prepend( npy_array_list_t *list, npy_array_t *array, char *filename )
+/* OMG: Unify some of the duplicate code in append/prepand functions. */
+npy_array_list_t * npy_array_list_prepend( npy_array_list_t *list, npy_array_t *array, const char *filename, ... )
 {
+    /* First get the full filename */
+    va_list ap1, ap2;
+    int len;
+
+    va_start( ap1, filename );
+    va_copy( ap2, ap1 );
+    len = vsnprintf( NULL, 0, filename, ap1 );
+    va_end( ap1 );
+
+    if( len > MAX_FILENAME_LEN ){
+        /* If someone is trying to cook up a special filename that can contain executable code, I think it is wise
+           to limit the length of the filename */
+        fprintf( stderr, "Warning: Cannot save neural network. Your filename is too long."
+                " Please limit the filename to %d characters.\n", MAX_FILENAME_LEN );
+        return list;
+    }
+
+    char *real_filename = malloc( (len+1) * sizeof(char));
+    assert( real_filename );
+
+    vsprintf( real_filename, filename, ap2 );
+    va_end( ap2 );
+
     npy_array_list_t *new_list;
 
     new_list = npy_array_list_new();
     if ( !new_list ) return list;
     new_list->array = array;
-    new_list->filename = filename;
+    new_list->filename = real_filename;
     new_list->crc32 = _crc32_from_npy_array ( array, NULL );
     new_list->next = list;
     return new_list;
@@ -222,7 +256,8 @@ int npy_array_list_save( const char *filename, npy_array_list_t *array_list )
     int n = 0;
 
     for( npy_array_list_t *iter = array_list; iter; iter = iter->next ){
-        /* Set the name of the file */
+        /* if the filename is not set, set one. However.. if the list was created with append and prepend,
+         * this will never be true. */
         if(!iter->filename)
             iter->filename = _new_internal_filename( n );
 
@@ -453,7 +488,6 @@ npy_array_t * npy_array_load( const char *filename )
     return m;
 }
 
-#define _MAX_ARRAY_LENGTH 128
 npy_array_list_t * npy_array_list_load( const char *filename )
 {
     FILE *fp = fopen(filename, "rb");
@@ -511,7 +545,14 @@ npy_array_list_t * npy_array_list_load( const char *filename )
             fprintf(stderr, "Cannot read matrix.\n");
             continue;
         }
-        list = npy_array_list_append( list, a, _local_strndup( lh->file_name, lh->file_name_length));
+
+        /* OH! lh->file_name is not NULL terminated, so we need some good ol' C string handling.... */
+        char internal_filename[MAX_FILENAME_LEN+1];
+        memset( internal_filename, 0, MAX_FILENAME_LEN+1 );
+        for( int i = 0; i < lh->file_name_length; i++)
+            internal_filename[i] = lh->file_name[i];
+
+        list = npy_array_list_append( list, a, internal_filename );
         local_file_header_free( lh );
     }
 
