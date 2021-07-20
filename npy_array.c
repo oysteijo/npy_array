@@ -1,13 +1,12 @@
 #include "npy_array.h"
-#include "zipcontainer.h"
-#include "crc32.h"
-#include "dostime.h"
 
 #include <stdio.h>
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
 #include <stdarg.h>
+
+#include <zip.h>
 
 #define NPY_ARRAY_MAGIC_STRING {0x93,'N','U','M','P','Y'}
 #define NPY_ARRAY_MAGIC_LENGTH 6
@@ -24,6 +23,17 @@
 #define NPY_ARRAY_DICT_BUFSIZE 1024
 
 #define MAX_FILENAME_LEN 80
+
+typedef int64_t (*reader_func)( void *fp, void *buffer, uint64_t nbytes );
+static int64_t read_file( void *fp, void *buffer, uint64_t nbytes )
+{
+    return (int64_t) fread( buffer, 1, nbytes, (FILE *) fp );
+}
+
+static int64_t read_zip( void *fp, void *buffer, uint64_t nbytes )
+{
+    return (int64_t) zip_fread( (zip_file_t *) fp, buffer, nbytes );
+}
 
 static void _header_from_npy_array( const npy_array_t *m,  char *buf, size_t *hlen )
 {
@@ -86,6 +96,7 @@ static size_t _calculate_datasize( const npy_array_t *m )
     return n_elements * m->elem_size;
 }
 
+#if 0
 static uint32_t _crc32_from_npy_array( const npy_array_t *m, uint32_t *size )
 {
     char header[NPY_ARRAY_DICT_BUFSIZE + NPY_ARRAY_PREHEADER_LENGTH] = {'\0'};
@@ -98,32 +109,7 @@ static uint32_t _crc32_from_npy_array( const npy_array_t *m, uint32_t *size )
     crc = crc32( 0, header, hlen );
     return crc32( crc, m->data, datasize );
 }
-
-/* FIXME: tell caller about the fails */
-static void _write_matrix( FILE *fp, const npy_array_t *m )
-{
-
-    char header[NPY_ARRAY_DICT_BUFSIZE + NPY_ARRAY_PREHEADER_LENGTH] = {'\0'};
-
-    size_t hlen = 0;
-    _header_from_npy_array( m, header, &hlen );
-
-    size_t chk = fwrite( header, sizeof(char), hlen, fp );
-    if( chk != hlen){
-        fprintf(stderr, "Could not write header data.\n");
-    }
-
-    size_t n_elements = 1;
-    int idx = 0;
-    while ( m->shape[ idx ] > 0 )
-        n_elements *= m->shape[ idx++ ];
-
-    chk = fwrite( m->data, m->elem_size, n_elements, fp );
-    if( chk != n_elements){
-        fprintf(stderr, "Could not write all data.\n");
-    }
-    return;
-}
+#endif
 
 static npy_array_list_t * npy_array_list_new()
 {
@@ -133,7 +119,6 @@ static npy_array_list_t * npy_array_list_new()
 
     list->array    = NULL;
     list->filename = NULL;
-    list->crc32    = 0;
     list->next     = NULL;
     return list;
 }
@@ -183,7 +168,9 @@ npy_array_list_t * npy_array_list_append( npy_array_list_t *list, npy_array_t *a
     if ( !new_list ) return list;
     new_list->array = array;
     new_list->filename = real_filename;
+#if 0
     new_list->crc32 = _crc32_from_npy_array ( array, NULL );
+#endif
     new_list->next = NULL;
 
     if(list) {
@@ -228,7 +215,9 @@ npy_array_list_t * npy_array_list_prepend( npy_array_list_t *list, npy_array_t *
     if ( !new_list ) return list;
     new_list->array = array;
     new_list->filename = real_filename;
+#if 0
     new_list->crc32 = _crc32_from_npy_array ( array, NULL );
+#endif
     new_list->next = list;
     return new_list;
 }
@@ -246,20 +235,55 @@ int npy_array_list_save( const char *filename, npy_array_list_t *array_list )
     if ( !array_list )
         return 0;
 
+    zip_t *zip = zip_open( filename, ZIP_CREATE | ZIP_TRUNCATE, NULL );
+    assert( zip );
+#if 0
     FILE *fp = fopen( filename, "wb" );
+
     if ( !fp ){
         fprintf(stderr, "Cannot open file '%s' for writing\n", filename);
         return -1;
     }
-
-    // int n = (int) npy_array_matrix_array_length( array );
+#endif
     int n = 0;
-
     for( npy_array_list_t *iter = array_list; iter; iter = iter->next ){
         /* if the filename is not set, set one. However.. if the list was created with append and prepend,
          * this will never be true. */
         if(!iter->filename)
             iter->filename = _new_internal_filename( n );
+
+        char header[NPY_ARRAY_DICT_BUFSIZE + NPY_ARRAY_PREHEADER_LENGTH] = {'\0'};
+
+        npy_array_t *m = iter->array;
+
+        size_t hlen = 0;
+        _header_from_npy_array( m, header, &hlen );
+        size_t datasize = _calculate_datasize( m );
+
+        char *matrix_npy_format = malloc( hlen + datasize );
+        assert( matrix_npy_format );
+        memcpy( matrix_npy_format, header, hlen );
+        memcpy( matrix_npy_format + hlen, m->data, datasize );
+
+        /* FIXME: Check for error */
+        zip_source_t *s = zip_source_buffer_create( matrix_npy_format, hlen + datasize, 1, NULL);
+        assert(s); 
+
+        int idx = zip_file_add( zip, iter->filename, s, ZIP_FL_ENC_UTF_8 );
+        if( idx != n )
+            fprintf( stderr, "Warning: Index and counter mismatch.");
+
+        // fprintf(stderr, "Error: %s\n", zip_strerror( zip ));
+        
+        n++;
+    }
+    if ( zip_close( zip ) < 0 ){
+        fprintf(stderr, "What? no close?\n");
+        fprintf(stderr, "Error: %s\n", zip_strerror( zip ));
+    }
+    return n;
+#if 0
+
 
         /* Find the time */
         time_t now = time(NULL);
@@ -327,6 +351,7 @@ int npy_array_list_save( const char *filename, npy_array_list_t *array_list )
     _write_end_of_central_dir( fp, &eocd );
     fclose( fp );
     return n;
+#endif
 }
 
 
@@ -346,10 +371,10 @@ static inline bool is_encypted( uint16_t flag )
     return flag & (uint16_t) 0x1;
 }
 
-static npy_array_t * _read_matrix( FILE *fp )
+static npy_array_t * _read_matrix( void *fp, reader_func read_func )
 {
     char fixed_header[NPY_ARRAY_PREHEADER_LENGTH + 1];
-    size_t chk = fread( fixed_header, sizeof(char), NPY_ARRAY_PREHEADER_LENGTH, fp );
+    size_t chk = read_func( fp, fixed_header, NPY_ARRAY_PREHEADER_LENGTH );
     if( chk != NPY_ARRAY_PREHEADER_LENGTH ){
         fprintf(stderr, "Cannot read pre header bytes.\n");
         return NULL;
@@ -375,7 +400,7 @@ static npy_array_t * _read_matrix( FILE *fp )
     header_length |= fixed_header[NPY_ARRAY_HEADER_LENGTH_HIGH_IDX] << 8;   /* Is a byte always 8 bit? */
     
     char header[header_length + 1];
-    chk = fread( header, sizeof(char), header_length, fp );
+    chk = read_func( fp, header, header_length );
     if( chk != header_length){
         fprintf(stderr, "Cannot read header. %d bytes.\n", header_length);
         return NULL;
@@ -461,14 +486,13 @@ static npy_array_t * _read_matrix( FILE *fp )
         return NULL;
     }
 
-    chk = fread( m->data, m->elem_size, n_elements, fp );
-    if( chk != n_elements){
+    chk = read_func( fp, m->data, m->elem_size * n_elements ); /* Can the multiplication overflow? */ 
+    if( chk != m->elem_size * n_elements){
         fprintf(stderr, "Could not read all data.\n");
         free( m->data );
         free( m );
         return NULL;
     }
-
     return m;
 }
 
@@ -481,7 +505,7 @@ npy_array_t * npy_array_load( const char *filename )
         return NULL;
     }
 
-    npy_array_t *m = _read_matrix( fp );
+    npy_array_t *m = _read_matrix( fp, &read_file);
     if(!m) { fprintf(stderr, "Cannot read matrix.\n"); }
 
     fclose(fp);
@@ -490,15 +514,19 @@ npy_array_t * npy_array_load( const char *filename )
 
 npy_array_list_t * npy_array_list_load( const char *filename )
 {
+    /* FIXME: Check error */
+    zip_t *zip = zip_open(filename, ZIP_RDONLY, NULL );
+
+#if 0
     FILE *fp = fopen(filename, "rb");
     if( !fp ){
         fprintf(stderr,"Cannot open '%s' for reading.\n", filename );
         perror("Error");
         return NULL;
     }
-
+#endif
     npy_array_list_t *list = NULL;
-
+#if 0
     /* Check that is is a PKZIP file (which happens to be the same as .npz format  */
     char check[5] = { '\0' };
     if( 4 != fread( check, 1, 4, fp )){
@@ -513,7 +541,7 @@ npy_array_list_t * npy_array_list_load( const char *filename )
     }
     fseek( fp, -4, SEEK_CUR );
     /* The check ends here */
-    
+
     while ( true ){
         local_file_header_t *lh;
         if( NULL == ( lh = local_file_header_new_from_fp( fp )))
@@ -540,7 +568,7 @@ npy_array_list_t * npy_array_list_load( const char *filename )
         }
 
         /* done reading header - read the matrix */
-        npy_array_t *a = _read_matrix( fp );
+        npy_array_t *a = _read_matrix( fp, &read_file );
         if( !a ){
             fprintf(stderr, "Cannot read matrix.\n");
             continue;
@@ -559,6 +587,16 @@ npy_array_list_t * npy_array_list_load( const char *filename )
     /* Here I could read the Central directory items, however I really do not care as
      * I already have all the data I need. Fuck the central directory!   */
     fclose( fp );
+#endif
+    for( int i = 0; i < zip_get_num_entries( zip, 0 ); i++ ){
+        zip_file_t *fp = zip_fopen_index( zip, i, 0 ); /* FIXME Some checks */
+        npy_array_t *arr = _read_matrix( fp, &read_zip );
+        list = npy_array_list_append( list, arr, zip_get_name( zip, i, 0 ));
+        zip_fclose( fp );
+    }
+
+    zip_close(zip);
+    
     return list;
 }
 
@@ -585,7 +623,7 @@ void npy_array_dump( const npy_array_t *m )
     printf("Dimensions   : %d\n", m->ndim);
     printf("Shape        : ( ");
     for( int i = 0; i < m->ndim - 1; i++) printf("%d, ", (int) m->shape[i]);
-    printf("%d)\n", (int) m->shape[m->ndim-1]);
+    printf("%d )\n", (int) m->shape[m->ndim-1]);
     printf("Type         : '%c' ", m->typechar);
     printf("(%d bytes each element)\n", (int) m->elem_size);
     printf("Fortran order: %s\n", m->fortran_order ? "True" : "False" );
@@ -605,7 +643,21 @@ void npy_array_save( const char *filename, const npy_array_t *m )
         perror("Error");
         return;
     }
-    _write_matrix( fp, m );
+
+    char header[NPY_ARRAY_DICT_BUFSIZE + NPY_ARRAY_PREHEADER_LENGTH] = {'\0'};
+    size_t hlen = 0;
+    _header_from_npy_array( m, header, &hlen );
+
+    size_t chk = fwrite( header, 1, hlen, fp );
+    if( chk != hlen){
+        fprintf(stderr, "Could not write header data.\n");
+    }
+
+    size_t datasize = _calculate_datasize( m );
+    chk = fwrite( m->data, 1, datasize, fp );
+    if( chk != datasize){
+        fprintf(stderr, "Could not write all data.\n");
+    }
     fclose(fp);
 }
 

@@ -20,7 +20,6 @@ typedef struct _npy_array_t {
 typedef struct _npy_array_list_t {
     npy_array_t      *array;
     char             *filename;
-    uint32_t          crc32;
     struct _npy_array_list_t *next;
 } npy_array_list_t;
 
