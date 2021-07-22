@@ -96,21 +96,6 @@ static size_t _calculate_datasize( const npy_array_t *m )
     return n_elements * m->elem_size;
 }
 
-#if 0
-static uint32_t _crc32_from_npy_array( const npy_array_t *m, uint32_t *size )
-{
-    char header[NPY_ARRAY_DICT_BUFSIZE + NPY_ARRAY_PREHEADER_LENGTH] = {'\0'};
-
-    size_t hlen = 0;
-    _header_from_npy_array( m, header, &hlen );
-    size_t datasize = _calculate_datasize( m );
-    if(size) *size = hlen + datasize;
-    uint32_t crc;
-    crc = crc32( 0, header, hlen );
-    return crc32( crc, m->data, datasize );
-}
-#endif
-
 static npy_array_list_t * npy_array_list_new()
 {
     npy_array_list_t *list = malloc( sizeof(npy_array_list_t ));
@@ -168,9 +153,6 @@ npy_array_list_t * npy_array_list_append( npy_array_list_t *list, npy_array_t *a
     if ( !new_list ) return list;
     new_list->array = array;
     new_list->filename = real_filename;
-#if 0
-    new_list->crc32 = _crc32_from_npy_array ( array, NULL );
-#endif
     new_list->next = NULL;
 
     if(list) {
@@ -215,9 +197,6 @@ npy_array_list_t * npy_array_list_prepend( npy_array_list_t *list, npy_array_t *
     if ( !new_list ) return list;
     new_list->array = array;
     new_list->filename = real_filename;
-#if 0
-    new_list->crc32 = _crc32_from_npy_array ( array, NULL );
-#endif
     new_list->next = list;
     return new_list;
 }
@@ -235,16 +214,10 @@ int npy_array_list_save( const char *filename, npy_array_list_t *array_list )
     if ( !array_list )
         return 0;
 
+    /* FIXME: Better test */
     zip_t *zip = zip_open( filename, ZIP_CREATE | ZIP_TRUNCATE, NULL );
     assert( zip );
-#if 0
-    FILE *fp = fopen( filename, "wb" );
 
-    if ( !fp ){
-        fprintf(stderr, "Cannot open file '%s' for writing\n", filename);
-        return -1;
-    }
-#endif
     int n = 0;
     for( npy_array_list_t *iter = array_list; iter; iter = iter->next ){
         /* if the filename is not set, set one. However.. if the list was created with append and prepend,
@@ -282,78 +255,7 @@ int npy_array_list_save( const char *filename, npy_array_list_t *array_list )
         fprintf(stderr, "Error: %s\n", zip_strerror( zip ));
     }
     return n;
-#if 0
-
-
-        /* Find the time */
-        time_t now = time(NULL);
-        dostime_t dt_now = unix2dostime( now );
-
-        uint32_t size = 0;
-        uint32_t crc32 = _crc32_from_npy_array( iter->array, &size );
-
-        local_file_header_t lfh = {
-            .local_file_header_signature = LOCAL_HEADER_SIGNATURE,                   /*  4 bytes  (LOCAL_HEADER_SIGNATURE) */
-            .version_needed_to_extract   = 20,                           /*  2 bytes */
-            .last_mod_file_time          = (uint16_t) (dt_now & 0xffff), /*  2 bytes */
-            .last_mod_file_date          = (uint16_t) (dt_now >> 16),    /*  2 bytes */
-            .crc_32                      = crc32,                        /*  4 bytes */
-            .compressed_size             = size,                         /*  4 bytes */
-            .uncompressed_size           = size,                         /*  4 bytes */
-            .file_name_length            = strlen(iter->filename),       /*  2 bytes */
-        };
-        lfh.file_name = iter->filename;
-        _write_local_fileheader( fp, &lfh );
-        _write_matrix          ( fp, iter->array );
-        n++;
-    }
-
-    uint32_t offset_count = 0;
-    uint32_t total_namelength = 0;
-    for( npy_array_list_t *iter = array_list; iter; iter = iter->next ){
-        /* central directory */
-
-        /* Find the time */
-        /* OK ... the time might be different in CD than in local, but I guess that's not a problem? */
-        time_t now = time(NULL);
-        dostime_t dt_now = unix2dostime( now );
-
-        uint32_t size;
-        uint32_t crc32 = _crc32_from_npy_array( iter->array, &size );
-        central_directory_header_t cdh = {
-            .central_file_header_signature = CENTRAL_DIRECTORY_HEADER_SIGNATURE, /* 4 bytes */
-            .version_made_by               = 788,        /* My python uses this. Should I use something else? */ /* 2 bytes */
-            .version_needed_to_extract     = 20,         /* 2 bytes */
-            .last_mod_file_time            = (uint16_t) (dt_now & 0xffff), /*  2 bytes */
-            .last_mod_file_date            = (uint16_t) (dt_now >> 16),    /*  2 bytes */
-            .crc_32                        = crc32,                        /*  4 bytes */
-            .compressed_size               = size,                         /*  4 bytes */
-            .uncompressed_size             = size,                         /*  4 bytes */
-            .external_file_attributes      = 0x1a40000,                    /*  Unix: -rw-r--r-- (644) */
-            .file_name_length              = strlen(iter->filename),       /*  2 bytes */
-            .relative_offset_of_local_header = offset_count                /* 4 bytes */
-        };
-        cdh.file_name = iter->filename;
-
-        _write_cental_directory_fileheader( fp, &cdh );
-        offset_count += size + cdh.file_name_length + LOCAL_HEADER_LENGTH;
-        total_namelength += cdh.file_name_length;
-    }
-
-    end_of_central_dir_t eocd = {
-        .end_of_central_dir_signature    = END_OF_CENTRAL_DIR_SIGNATURE,       /*  4 bytes (END_OF_CENTRAL_DIR_SIGNATURE) */
-        .total_num_entries_this_disk     = (uint16_t) n,     /*  2 bytes */
-        .total_num_entries_cd            = (uint16_t) n,     /*  2 bytes */
-        .size_of_cd                      = (uint32_t) n * CENTRAL_DIRECTORY_HEADER_LENGTH + total_namelength,  /*  4 bytes */
-        .offset_cd_wrt_disknum           = offset_count     /*  4 bytes */
-    };
-
-    _write_end_of_central_dir( fp, &eocd );
-    fclose( fp );
-    return n;
-#endif
 }
-
 
 static char *find_header_item( const char *item, const char *header)
 {
@@ -366,11 +268,7 @@ static inline char endianness(){
     return (*(char *)&val == 1) ? '<' : '>';
 }
 
-static inline bool is_encypted( uint16_t flag )
-{
-    return flag & (uint16_t) 0x1;
-}
-
+/* consider if this function should be exported to the end user */
 static npy_array_t * _read_matrix( void *fp, reader_func read_func )
 {
     char fixed_header[NPY_ARRAY_PREHEADER_LENGTH + 1];
@@ -517,77 +415,7 @@ npy_array_list_t * npy_array_list_load( const char *filename )
     /* FIXME: Check error */
     zip_t *zip = zip_open(filename, ZIP_RDONLY, NULL );
 
-#if 0
-    FILE *fp = fopen(filename, "rb");
-    if( !fp ){
-        fprintf(stderr,"Cannot open '%s' for reading.\n", filename );
-        perror("Error");
-        return NULL;
-    }
-#endif
     npy_array_list_t *list = NULL;
-#if 0
-    /* Check that is is a PKZIP file (which happens to be the same as .npz format  */
-    char check[5] = { '\0' };
-    if( 4 != fread( check, 1, 4, fp )){
-        fprintf(stderr, "Warning: cannot read from '%s'.\n", filename );
-        fclose( fp );
-        return NULL;
-    }
-
-    if( check[0] != 'P' || check[1] != 'K' ){
-        fclose(fp);   /* Failing silently is intentional. caller should handle this. */
-        return NULL;
-    }
-    fseek( fp, -4, SEEK_CUR );
-    /* The check ends here */
-
-    while ( true ){
-        local_file_header_t *lh;
-        if( NULL == ( lh = local_file_header_new_from_fp( fp )))
-            break;
-
-        /* FIXME: Support for compressed files */
-        if( lh->compression_method != 0 ){
-            fprintf(stderr, "local file '%s' is compressed. Skipping.\n", lh->file_name);
-            fprintf(stderr, "Still no support for reading compressed files.\n"
-                    "Please store numpy array with np.savez() instead of np.savez_compressed().\n");
-            continue;
-        }
-
-        /* FIXME: Support for encrypted files */
-        if( is_encypted( lh->general_purpose_bit_flag )) {
-            fprintf(stderr, "local file '%s' is encrypted. Skipping.\n", lh->file_name);
-            continue;
-        }
-
-        if( lh->general_purpose_bit_flag & (uint16_t) 0x4 ){
-            fprintf(stderr, "No support for streamed datafiles with data descriptor.\n");
-            /* fread( ... ); */
-            continue;
-        }
-
-        /* done reading header - read the matrix */
-        npy_array_t *a = _read_matrix( fp, &read_file );
-        if( !a ){
-            fprintf(stderr, "Cannot read matrix.\n");
-            continue;
-        }
-
-        /* OH! lh->file_name is not NULL terminated, so we need some good ol' C string handling.... */
-        char internal_filename[MAX_FILENAME_LEN+1];
-        memset( internal_filename, 0, MAX_FILENAME_LEN+1 );
-        for( int i = 0; i < lh->file_name_length; i++)
-            internal_filename[i] = lh->file_name[i];
-
-        list = npy_array_list_append( list, a, internal_filename );
-        local_file_header_free( lh );
-    }
-
-    /* Here I could read the Central directory items, however I really do not care as
-     * I already have all the data I need. Fuck the central directory!   */
-    fclose( fp );
-#endif
     for( int i = 0; i < zip_get_num_entries( zip, 0 ); i++ ){
         zip_file_t *fp = zip_fopen_index( zip, i, 0 ); /* FIXME Some checks */
         npy_array_t *arr = _read_matrix( fp, &read_zip );
