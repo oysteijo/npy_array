@@ -6,8 +6,6 @@
 #include <assert.h>
 #include <stdarg.h>
 
-#include <zip.h>
-
 #define NPY_ARRAY_MAGIC_STRING {0x93,'N','U','M','P','Y'}
 #define NPY_ARRAY_MAGIC_LENGTH 6
 #define NPY_ARRAY_VERSION_HEADER_LENGTH 4
@@ -211,6 +209,11 @@ static char * _new_internal_filename( int n )
 
 int npy_array_list_save( const char *filename, npy_array_list_t *array_list )
 {
+    return npy_array_list_save_compressed( filename, array_list, ZIP_CM_STORE, 0);
+}
+
+int npy_array_list_save_compressed( const char *filename, npy_array_list_t *array_list, zip_int32_t comp, zip_uint32_t comp_flags)
+{
     if ( !array_list )
         return 0;
 
@@ -220,6 +223,9 @@ int npy_array_list_save( const char *filename, npy_array_list_t *array_list )
 
     int n = 0;
     for( npy_array_list_t *iter = array_list; iter; iter = iter->next ){
+        if ( zip_set_file_compression(zip, n, comp, comp_flags) < 0){
+            /* what is wrong? */
+        }
         /* if the filename is not set, set one. However.. if the list was created with append and prepend,
          * this will never be true. */
         if(!iter->filename)
