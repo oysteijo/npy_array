@@ -418,15 +418,27 @@ npy_array_t * npy_array_load( const char *filename )
 
 npy_array_list_t * npy_array_list_load( const char *filename )
 {
-    /* FIXME: Check error */
+    /* FIXME: better check. what went wrong? */
     zip_t *zip = zip_open(filename, ZIP_RDONLY, NULL );
+    if( !zip ){
+        fprintf(stderr, "cannot zip_open file: %s\n", filename );
+       return NULL;
+    }
 
     npy_array_list_t *list = NULL;
     for( int i = 0; i < zip_get_num_entries( zip, 0 ); i++ ){
-        zip_file_t *fp = zip_fopen_index( zip, i, 0 ); /* FIXME Some checks */
+        zip_file_t *fp = zip_fopen_index( zip, i, 0 ); /* FIXME Better checks */
+        if (!fp ){
+            fprintf(stderr, "Warning: Cannot open internal file of index %d in archive '%s'.\n", i, filename );
+            continue;
+        }
         npy_array_t *arr = _read_matrix( fp, &read_zip );
-        list = npy_array_list_append( list, arr, zip_get_name( zip, i, 0 ));
         zip_fclose( fp );
+        if(!arr) {
+            fprintf(stderr, "Warning: Cannot read matrix.\n");
+            continue;
+        }
+        list = npy_array_list_append( list, arr, zip_get_name( zip, i, 0 ));
     }
 
     zip_close(zip);
