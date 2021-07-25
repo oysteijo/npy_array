@@ -16,6 +16,21 @@ that can be opened in a C implemented neural network.
 Credit should also go to Just Jordi Castells, and [his blogpost](http://jcastellssala.com/2014/02/01/npy-in-c/),
 which inspired me to write this.
 
+### New of summer 2021
+
+The archive (`.npz`) files are now handeled by [libzip](https://libzip.org/). This redesign
+creates a dependency of libzip of course, but it simplifies the code a lot. It also makes it
+possible to read and save compressed numpy arrays. It is therefore added a new public function:
+
+    int
+    npy_array_list_save_compressed( const char       *filename,
+                                    npy_array_list_t *array_list,
+                                    zip_int32_t       comp,
+                                    zip_uint32_t      comp_flags);
+
+This new public function will save a `.npz` file using compression based on `comp` and
+`comp_flags` which are the same parameters as in libzip. 
+
 ### Important message if you've used this library before 15th Feb 2020.
 I have made some changes huge changes to this library mid february 2020. The main
 data structure is renamed from `cmatrix_t` to `npy_array_t` to illustrate better that
@@ -66,7 +81,6 @@ And the linked list structure for `.npz` files:
     typedef struct _npy_array_list_t {
         npy_array_t      *array;
         char             *filename;
-        uint32_t          crc32;
         struct _npy_array_list_t *next;
     } npy_array_list_t;
 
