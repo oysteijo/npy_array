@@ -119,23 +119,21 @@ void npy_array_list_free( npy_array_list_t *list )
     free( list );
 }
 
-npy_array_list_t * npy_array_list_append( npy_array_list_t *list, npy_array_t *array, const char *filename, ... )
+static char * _va_args_filename( const char *filename, va_list ap1 )
 {
-    /* First get the full filename */
-    va_list ap1, ap2;
+    va_list ap2;
     int len;
-
-    va_start( ap1, filename );
-    va_copy( ap2, ap1 );
+     
+    va_copy( ap2, ap1); 
     len = vsnprintf( NULL, 0, filename, ap1 );
     va_end( ap1 );
 
     if( len > MAX_FILENAME_LEN ){
         /* If someone is trying to cook up a special filename that can contain executable code, I think it is wise
            to limit the length of the filename */
-        fprintf( stderr, "Warning: Cannot save neural network. Your filename is too long."
+        fprintf( stderr, "Warning: Cannot save numpy array. Your filename is too long."
                 " Please limit the filename to %d characters.\n", MAX_FILENAME_LEN );
-        return list;
+        return NULL;
     }
 
     char *real_filename = malloc( (len+1) * sizeof(char));
@@ -144,60 +142,47 @@ npy_array_list_t * npy_array_list_append( npy_array_list_t *list, npy_array_t *a
     vsprintf( real_filename, filename, ap2 );
     va_end( ap2 );
 
-    /* And then we append...  But we have to find the last element first */
-    npy_array_list_t *new_list;
+    return real_filename;
+}
 
-    new_list = npy_array_list_new();
-    if ( !new_list ) return list;
-    new_list->array = array;
-    new_list->filename = real_filename;
-    new_list->next = NULL;
-
+static npy_array_list_t * _list_append( npy_array_list_t *list, npy_array_list_t *new_elem )
+{
     if(list) {
         npy_array_list_t *last = list;
         while(last->next)
             last = last->next;
-        last->next = new_list;
+        last->next = new_elem;
         return list;
     }
-    return new_list;
+    new_elem->next = NULL;
+    return new_elem;
 }
 
-/* OMG: Unify some of the duplicate code in append/prepand functions. */
-npy_array_list_t * npy_array_list_prepend( npy_array_list_t *list, npy_array_t *array, const char *filename, ... )
+static npy_array_list_t * _list_prepend( npy_array_list_t *list, npy_array_list_t *new_elem )
 {
-    /* First get the full filename */
-    va_list ap1, ap2;
-    int len;
-
-    va_start( ap1, filename );
-    va_copy( ap2, ap1 );
-    len = vsnprintf( NULL, 0, filename, ap1 );
-    va_end( ap1 );
-
-    if( len > MAX_FILENAME_LEN ){
-        /* If someone is trying to cook up a special filename that can contain executable code, I think it is wise
-           to limit the length of the filename */
-        fprintf( stderr, "Warning: Cannot save neural network. Your filename is too long."
-                " Please limit the filename to %d characters.\n", MAX_FILENAME_LEN );
-        return list;
-    }
-
-    char *real_filename = malloc( (len+1) * sizeof(char));
-    assert( real_filename );
-
-    vsprintf( real_filename, filename, ap2 );
-    va_end( ap2 );
-
-    npy_array_list_t *new_list;
-
-    new_list = npy_array_list_new();
-    if ( !new_list ) return list;
-    new_list->array = array;
-    new_list->filename = real_filename;
-    new_list->next = list;
-    return new_list;
+    new_elem->next = list;
+    return new_elem;
 }
+
+#define create_extend_list_func(oper) \
+npy_array_list_t * npy_array_list_ ##oper ( npy_array_list_t *list, npy_array_t *array, const char *filename, ... ) \
+{ \
+    npy_array_list_t *new_list = npy_array_list_new(); \
+    if ( !new_list ) return list; \
+    new_list->array = array; \
+\
+    va_list ap1; \
+    va_start( ap1, filename ); \
+    new_list->filename = _va_args_filename( filename, ap1 ); \
+    assert( new_list->filename ); \
+    va_end( ap1 ); \
+\
+    return _list_ ##oper ( list, new_list ); \
+} 
+/* Expand the macros */
+create_extend_list_func(append)
+create_extend_list_func(prepend)
+#undef create_extend_list_func
 
 static char * _new_internal_filename( int n )
 {
@@ -422,7 +407,7 @@ npy_array_list_t * npy_array_list_load( const char *filename )
     zip_t *zip = zip_open(filename, ZIP_RDONLY, NULL );
     if( !zip ){
         fprintf(stderr, "cannot zip_open file: %s\n", filename );
-       return NULL;
+        return NULL;
     }
 
     npy_array_list_t *list = NULL;
