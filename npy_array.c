@@ -164,8 +164,8 @@ static npy_array_list_t * _list_prepend( npy_array_list_t *list, npy_array_list_
     return new_elem;
 }
 
-#define create_extend_list(pend) \
-npy_array_list_t * npy_array_list_ ##pend ( npy_array_list_t *list, npy_array_t *array, const char *filename, ... ) \
+#define create_extend_list_func(oper) \
+npy_array_list_t * npy_array_list_ ##oper ( npy_array_list_t *list, npy_array_t *array, const char *filename, ... ) \
 { \
     npy_array_list_t *new_list = npy_array_list_new(); \
     if ( !new_list ) return list; \
@@ -177,43 +177,13 @@ npy_array_list_t * npy_array_list_ ##pend ( npy_array_list_t *list, npy_array_t 
     assert( new_list->filename ); \
     va_end( ap1 ); \
 \
-    return _list_ ##pend ( list, new_list ); \
+    return _list_ ##oper ( list, new_list ); \
 } 
+/* Expand the macros */
+create_extend_list_func(append)
+create_extend_list_func(prepend)
+#undef create_extend_list_func
 
-create_extend_list(append)
-create_extend_list(prepend)
-#undef create_extend_list
-#if 0    
-npy_array_list_t * npy_array_list_append( npy_array_list_t *list, npy_array_t *array, const char *filename, ... )
-{
-    npy_array_list_t *new_list = npy_array_list_new();
-    if ( !new_list ) return list;
-    new_list->array = array;
-
-    va_list ap1;
-    va_start( ap1, filename );
-    new_list->filename = _va_args_filename( filename, ap1 );
-    assert( new_list->filename );
-    va_end( ap1 );
-
-    return _list_append( list, new_list );
-}
-
-npy_array_list_t * npy_array_list_prepend( npy_array_list_t *list, npy_array_t *array, const char *filename, ... )
-{
-    npy_array_list_t *new_list = npy_array_list_new();
-    if ( !new_list ) return list;
-    new_list->array = array;
-
-    va_list ap1;
-    va_start( ap1, filename );
-    new_list->filename = _va_args_filename( filename, ap1 );
-    assert( new_list->filename );
-    va_end( ap1 );
-
-    return _list_prepend( list, new_list );
-}
-#endif
 static char * _new_internal_filename( int n )
 {
     char *filename = malloc( MAX_FILENAME_LEN * sizeof(char) );
