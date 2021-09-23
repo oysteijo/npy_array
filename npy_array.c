@@ -131,7 +131,7 @@ static char * _va_args_filename( const char *filename, va_list ap1 )
     if( len > MAX_FILENAME_LEN ){
         /* If someone is trying to cook up a special filename that can contain executable code, I think it is wise
            to limit the length of the filename */
-        fprintf( stderr, "Warning: Cannot save neural network. Your filename is too long."
+        fprintf( stderr, "Warning: Cannot save numpy array. Your filename is too long."
                 " Please limit the filename to %d characters.\n", MAX_FILENAME_LEN );
         return NULL;
     }
