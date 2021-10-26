@@ -4,7 +4,6 @@
 #include <stdlib.h>
 #include <stdbool.h>
 #include <stdint.h>
-#include <zip.h>
 
 #define NPY_ARRAY_MAX_DIMENSIONS 8
 
@@ -18,24 +17,12 @@ typedef struct _npy_array_t {
     bool              fortran_order;
 } npy_array_t;
 
-typedef struct _npy_array_list_t {
-    npy_array_t      *array;
-    char             *filename;
-    struct _npy_array_list_t *next;
-} npy_array_list_t;
+typedef int64_t (*reader_func)( void *fp, void *buffer, uint64_t nbytes );
 
-npy_array_t*      npy_array_load       ( const char *filename);
+npy_array_t*      npy_array_load       ( const char *filename );
 void              npy_array_dump       ( const npy_array_t *m );
 void              npy_array_save       ( const char *filename, const npy_array_t *m );
 void              npy_array_free       ( npy_array_t *m );
 
-npy_array_list_t* npy_array_list_load           ( const char *filename );
-int               npy_array_list_save           ( const char *filename, npy_array_list_t *array_list );
-int               npy_array_list_save_compressed( const char *filename, npy_array_list_t *array_list, zip_int32_t comp, zip_uint32_t comp_flags);
-size_t            npy_array_list_length         ( npy_array_list_t *array_list);
-void              npy_array_list_free           ( npy_array_list_t *array_list);
-
-npy_array_list_t* npy_array_list_prepend( npy_array_list_t *list, npy_array_t *array, const char *filename, ...);
-npy_array_list_t* npy_array_list_append ( npy_array_list_t *list, npy_array_t *array, const char *filename, ...);
-
+npy_array_t *     _read_matrix         ( void *fp, reader_func read_func );
 #endif  /* __NPY_ARRAY_H__ */
