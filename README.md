@@ -87,11 +87,13 @@ And the linked list structure for `.npz` files:
 ## API
 The API is really simple. There is only ten public functions:
 
+    /* These are the four functions for loading and saving .npy files */
     npy_array_t*      npy_array_load        ( const char *filename);
     void              npy_array_dump        ( const npy_array_t *m );
     void              npy_array_save        ( const char *filename, const npy_array_t *m );
     void              npy_array_free        ( npy_array_t *m );
     
+    /* These are the six functions for loading and saving .npz files and lists of numpy arrays */
     npy_array_list_t* npy_array_list_load   ( const char *filename );
     int               npy_array_list_save   ( const char *filename, npy_array_list_t *array_list );
     size_t            npy_array_list_length ( npy_array_list_t *array_list);
@@ -133,9 +135,7 @@ recommend to install this.
 This is written in a full hurry one afternoon, and then modified over some time.
 There isn't much of testing performed, and you can read the code to see what is does.
 All errors are written to STDERR. Consider this alpha. So, reading and writing of
-both `.npy` and `.npz` files seems to work OK -- some obvious bugs of course -- however
-there is still no support for `np.savez_compressed()` saved arrays, nor support for saving
-such files. (I guess I need to use MiniZip (from zlib) for that, and that creates a dependency.)
+both `.npy` and `.npz` files seems to work OK -- some obvious bugs of course -- 
 
 ## TODO
  * Bugfixes
