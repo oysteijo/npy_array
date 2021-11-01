@@ -36,7 +36,16 @@ for arg in "$@"; do
     esac
 done
 
-echo 'generating makefile ...'
+# Check if libzip is installed
+have_libzip=`echo "#include <zip.h>" | gcc -c -o /dev/null -Werror -xc - > /dev/null 2>/dev/null && echo "True" || echo "False"`
+echo "zip.h found: $have_libzip"
+if [ "$have_libzip" != "True" ]; then
+    echo "WARNING: libzip library not found!"
+    echo "libzip is highly recommended and was not found on this system. Please install the libzip packet(s) for your system."
+    exit
+fi 
+
+echo 'generating Makefile ...'
 echo "PREFIX = $prefix" >Makefile
 if $debugsym; then
     echo 'dbg = -g' >>Makefile
