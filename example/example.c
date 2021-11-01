@@ -1,4 +1,5 @@
 #include "npy_array.h"
+#include "npy_array_list.h"
 #include <stdio.h>
 int main(int argc, char *argv[])
 {

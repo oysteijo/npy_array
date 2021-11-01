@@ -8,7 +8,7 @@ Generate some example numpy arrays and save them. This can be done by running th
 Now you can compile and run the example code.
 
     $ gcc -I.. -Wall -Wextra -O3 -c example.c
-    $ gcc -o example example.o -L.. -lnpy_array
+    $ gcc -o example example.o -L.. -lnpy_array -lzip
 
 Now run the example with a file as command line argument.
 
