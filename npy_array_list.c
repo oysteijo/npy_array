@@ -7,11 +7,6 @@
 #include <stdarg.h>
 
 #define MAX_FILENAME_LEN 80
-static int64_t read_zip( void *fp, void *buffer, uint64_t nbytes )
-{
-    return (int64_t) zip_fread( (zip_file_t *) fp, buffer, nbytes );
-}
-
 static npy_array_list_t * npy_array_list_new()
 {
     npy_array_list_t *list = malloc( sizeof(npy_array_list_t ));
@@ -115,6 +110,7 @@ int npy_array_list_save( const char *filename, npy_array_list_t *array_list )
     return npy_array_list_save_compressed( filename, array_list, ZIP_CM_STORE, 0);
 }
 
+#define _BUFSIZE 1024
 int npy_array_list_save_compressed( const char *filename, npy_array_list_t *array_list, zip_int32_t comp, zip_uint32_t comp_flags)
 {
     if ( !array_list )
@@ -134,13 +130,12 @@ int npy_array_list_save_compressed( const char *filename, npy_array_list_t *arra
         if(!iter->filename)
             iter->filename = _new_internal_filename( n );
 
-        char header[NPY_ARRAY_DICT_BUFSIZE + NPY_ARRAY_PREHEADER_LENGTH] = {'\0'};
+        char header[_BUFSIZE] = {'\0'};
 
         npy_array_t *m = iter->array;
 
-        size_t hlen = 0;
-        _header_from_npy_array( m, header, &hlen );
-        size_t datasize = _calculate_datasize( m );
+        size_t hlen = npy_array_get_header( m, header );
+        size_t datasize = npy_array_calculate_datasize( m );
 
         char *matrix_npy_format = malloc( hlen + datasize );
         assert( matrix_npy_format );

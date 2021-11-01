@@ -6,9 +6,6 @@
 #include <assert.h>
 
 #define NPY_ARRAY_MAGIC_STRING {0x93,'N','U','M','P','Y'}
-#define NPY_ARRAY_MAGIC_LENGTH 6
-#define NPY_ARRAY_VERSION_HEADER_LENGTH 4
-#define NPY_ARRAY_PREHEADER_LENGTH (NPY_ARRAY_MAGIC_LENGTH + NPY_ARRAY_VERSION_HEADER_LENGTH)
 #define NPY_ARRAY_MAJOR_VERSION_IDX 6
 #define NPY_ARRAY_MINOR_VERSION_IDX 7
 
@@ -17,16 +14,13 @@
 #define NPY_ARRAY_HEADER_LENGTH_HIGH_IDX 9
 
 #define NPY_ARRAY_SHAPE_BUFSIZE 512
+
 #define NPY_ARRAY_DICT_BUFSIZE 1024
+#define NPY_ARRAY_MAGIC_LENGTH 6
+#define NPY_ARRAY_VERSION_HEADER_LENGTH 4
+#define NPY_ARRAY_PREHEADER_LENGTH (NPY_ARRAY_MAGIC_LENGTH + NPY_ARRAY_VERSION_HEADER_LENGTH)
 
-typedef int64_t (*reader_func)( void *fp, void *buffer, uint64_t nbytes );
-static int64_t read_file( void *fp, void *buffer, uint64_t nbytes )
-{
-    return (int64_t) fread( buffer, 1, nbytes, (FILE *) fp );
-}
-
-
-static void _header_from_npy_array( const npy_array_t *m,  char *buf, size_t *hlen )
+size_t npy_array_get_header( const npy_array_t *m,  char *buf )
 {
     char *p = buf;
 
@@ -74,11 +68,11 @@ static void _header_from_npy_array( const npy_array_t *m,  char *buf, size_t *hl
     p += sizeof(uint16_t);
     memcpy( p, dict, len);
 
-    *hlen = len + NPY_ARRAY_PREHEADER_LENGTH;
+    return len + NPY_ARRAY_PREHEADER_LENGTH;
 #undef HEADER_LEN
 }
 
-static size_t _calculate_datasize( const npy_array_t *m )
+size_t npy_array_calculate_datasize( const npy_array_t *m )
 {
     size_t n_elements = 1;
     int idx = 0;
@@ -271,15 +265,14 @@ void npy_array_save( const char *filename, const npy_array_t *m )
     }
 
     char header[NPY_ARRAY_DICT_BUFSIZE + NPY_ARRAY_PREHEADER_LENGTH] = {'\0'};
-    size_t hlen = 0;
-    _header_from_npy_array( m, header, &hlen );
+    size_t hlen = npy_array_get_header( m, header );
 
     size_t chk = fwrite( header, 1, hlen, fp );
     if( chk != hlen){
         fprintf(stderr, "Could not write header data.\n");
     }
 
-    size_t datasize = _calculate_datasize( m );
+    size_t datasize = npy_array_calculate_datasize( m );
     chk = fwrite( m->data, 1, datasize, fp );
     if( chk != datasize){
         fprintf(stderr, "Could not write all data.\n");
