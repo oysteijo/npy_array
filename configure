@@ -37,6 +37,7 @@ for arg in "$@"; do
 done
 
 # Check if libzip is installed
+# FIXME: There are some issues here: this requires gcc, echo and a unix.like environment. What about icc, clang etc.? :-(
 have_libzip=`echo "#include <zip.h>" | gcc -c -o /dev/null -Werror -xc - > /dev/null 2>/dev/null && echo "True" || echo "False"`
 echo "zip.h found: $have_libzip"
 if [ "$have_libzip" != "True" ]; then
