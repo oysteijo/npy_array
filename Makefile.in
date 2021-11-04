@@ -34,9 +34,11 @@ install: $(alib)
 	mkdir -p $(DESTDIR)$(PREFIX)/include
 	cp $(alib) $(DESTDIR)$(PREFIX)/lib/$(alib)
 	cp npy_array.h $(DESTDIR)$(PREFIX)/include/
+	cp npy_array_list.h $(DESTDIR)$(PREFIX)/include/
 
 .PHONY: uninstall
 uninstall:
 	$(RM) $(DESTDIR)$(PREFIX)/lib/$(alib)
 	$(RM) $(DESTDIR)$(PREFIX)/include/npy_array.h
+	$(RM) $(DESTDIR)$(PREFIX)/include/npy_array_list.h
 
