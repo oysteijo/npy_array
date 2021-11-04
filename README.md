@@ -1,5 +1,7 @@
 # npy_array
 
+## An ANSI C library for handling numpy arrays
+
 A simple library for reading and writing numpy arrays in C code. It is independent
 of Python both compile time and runtime.
 
@@ -15,6 +17,10 @@ that can be opened in a C implemented neural network.
 
 Credit should also go to Just Jordi Castells, and [his blogpost](http://jcastellssala.com/2014/02/01/npy-in-c/),
 which inspired me to write this.
+
+### License
+
+This software is licensed unde BSD (3 clause) license.
 
 ### New of summer 2021
 
@@ -126,10 +132,10 @@ There is now a simple configure file provided (NOT autoconf/automake generated).
 
     ./configure
     make
+    sudo make install
 
 This will build a static library `libnpy_array.a` which can be linked in to your executable
-with the `-lnpy_array` option to the linker. Since this is such alpha stage, I do not
-recommend to install this.
+with the `-lnpy_array` option to the linker. 
 
 ## Status
 This is written in a full hurry one afternoon, and then modified over some time.
