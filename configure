@@ -1,35 +1,42 @@
 # vim: filetype=bash
 
-#!/bin/sh
+#!/bin/bash
 
+# Default values
 prefix=/usr/local
 debugsym=true
 profilesym=false
+shared=true
 
 for arg in "$@"; do
     case "$arg" in
     --prefix=*)
-        prefix=`echo $arg | sed 's/--prefix=//'`
+        prefix=`echo ${arg%/} | sed 's/--prefix=//'`
+        echo "prefix set to $prefix"
         ;;
-
     --enable-debug)
         debugsym=true;;
     --disable-debug)
         debugsym=false;;
-
     --enable-profile)
         profilesym=true;;
     --disable-profile)
         profilesym=false;;
+    --enable-shared)
+        shared=true;;
+    --disable-shared)
+        shared=false;;
 
     --help)
         echo 'usage: ./configure [options]'
         echo 'options:'
-        echo '  --prefix=<path>: installation prefix'
-        echo '  --enable-debug: include debug symbols'
-        echo '  --disable-debug: do not include debug symbols'
-        echo '  --enable-profile: include profile symbols'
-        echo '  --disable-profile: do not include profile symbols'
+        echo '  --prefix=<path>:     installation prefix'
+        echo '  --enable-debug:      include debug symbols (default on)'
+        echo '  --disable-debug:     do not include debug symbols'
+        echo '  --enable-profile:    include profile symbols (default off)'
+        echo '  --disable-profile:   do not include profile symbols'
+        echo '  --enable-shared:     build dynamic linked library. (default on)'
+        echo '  --disable-shared:    build static linked library'
         echo 'all invalid options are silently ignored'
         exit 0
         ;;
@@ -47,12 +54,13 @@ if [ "$have_libzip" != "True" ]; then
 fi 
 
 echo 'generating Makefile ...'
-echo "PREFIX = $prefix" >Makefile
+echo "PREFIX  = $prefix" >Makefile
 if $debugsym; then
-    echo 'dbg = -g' >>Makefile
+    echo 'dbg     = -g' >>Makefile
 fi
 if $profilesym; then
     echo 'profile = -pg' >>Makefile
 fi
-cat Makefile.in >>Makefile
-echo 'configuration complete, type make to build.'
+echo "shared  = $shared" >> Makefile
+echo "include Makefile.in" >>Makefile
+echo "configuration complete, type 'make' to build."

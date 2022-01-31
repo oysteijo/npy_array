@@ -1,17 +1,29 @@
 
 CC     = gcc
-CFLAGS = -std=c99 -Wall -Wextra -O3 $(dbg) $(profile)
+CFLAGS += -std=c99 -Wall -Wextra -O3 $(dbg) $(profile)
 
 src = $(wildcard *.c)
 obj = $(src:.c=.o)
 dep = $(obj:.o=.d)  # one dependency file for each source
 
-LDFLAGS = $(profile) 
+LDFLAGS += $(profile) 
 
-alib = libnpy_array.a
+target_lib = libnpy_array
 
-$(alib): $(obj)
+ifeq ($(shared), true)
+	target := $(addsuffix .so,$(target_lib))
+	CFLAGS += -fPIC
+else
+	target := $(addsuffix .a,$(target_lib))
+endif
+
+all: $(target)
+
+%.a: $(obj)
 	$(AR) rcs $@ $^
+
+%.so: $(obj)
+	$(CC) -shared -fPIC -o $@ $^ 
 
 -include $(dep)   # include all dep files in the makefile
 
@@ -21,22 +33,25 @@ $(alib): $(obj)
 	@$(CPP) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
 .PHONY: clean
-clean:
-	$(RM) $(obj) $(alib)
+clean: cleandep
+	$(RM) $(obj) $(target)
 
 .PHONY: cleandep
 cleandep:
 	$(RM) $(dep)
 
 .PHONY: install
-install: $(alib)
+install: $(target)
 	mkdir -p $(DESTDIR)$(PREFIX)/lib
 	mkdir -p $(DESTDIR)$(PREFIX)/include
-	cp $(alib) $(DESTDIR)$(PREFIX)/lib/$(alib)
+	cp $(target) $(DESTDIR)$(PREFIX)/lib/$(target)
+	strip $(DESTDIR)$(PREFIX)/lib/$(target)
 	cp npy_array.h $(DESTDIR)$(PREFIX)/include/
+	cp npy_array_list.h $(DESTDIR)$(PREFIX)/include/
 
 .PHONY: uninstall
 uninstall:
-	$(RM) $(DESTDIR)$(PREFIX)/lib/$(alib)
+	$(RM) $(DESTDIR)$(PREFIX)/lib/$(target)
 	$(RM) $(DESTDIR)$(PREFIX)/include/npy_array.h
+	$(RM) $(DESTDIR)$(PREFIX)/include/npy_array_list.h
 
