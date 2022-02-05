@@ -1,14 +1,22 @@
+# This is a pretty much general Makefile for libraries
 
-CC     = gcc
+target_lib = libnpy_array
+
+SHELL := /bin/bash
+
+CC      = gcc
 CFLAGS += -std=c99 -Wall -Wextra -O3 $(dbg) $(profile)
 
-src = $(wildcard *.c)
+ifeq ($(use_npz), true) 
+	src = $(wildcard *.c)
+else
+	src = npy_array.c
+endif
+
 obj = $(src:.c=.o)
 dep = $(obj:.o=.d)  # one dependency file for each source
 
 LDFLAGS += $(profile) 
-
-target_lib = libnpy_array
 
 ifeq ($(shared), true)
 	target := $(addsuffix .so,$(target_lib))
