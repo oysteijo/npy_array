@@ -2,6 +2,9 @@
 
 #!/bin/bash
 
+projectname=npy_array
+library=true
+
 # Default values
 prefix=/usr/local
 debugsym=true
@@ -13,7 +16,6 @@ for arg in "$@"; do
     case "$arg" in
     --prefix=*)
         prefix=`echo ${arg%/} | sed 's/--prefix=//'`
-        echo "prefix set to $prefix"
         ;;
     --enable-debug)
         debugsym=true;;
@@ -50,25 +52,81 @@ for arg in "$@"; do
     esac
 done
 
-# Check if libzip is installed
-# FIXME: There are some issues here: this requires gcc, echo and a unix.like environment. What about icc, clang etc.? :-(
-have_libzip=`echo "#include <zip.h>" | gcc -c -o /dev/null -Werror -xc - > /dev/null 2>/dev/null && echo "True" || echo "False"`
-echo "zip.h found: $have_libzip"
-if [ "$have_libzip" != "True" ]; then
+printf "Prefix set to  ...        %s\n" $prefix
+
+printf "Looking for pkg-config... "
+if command -v pkg-config &> /dev/null
+then
+    printf "Yes, we have pkg-config!\n"
+    have_libzip=`pkg-config --exists libzip && echo "true" || echo "false"`
+    have_pkg_config=true
+    libzip_libs=`pkg-config --libs libzip`
+else
+    printf "No, we do not have pkg-config!\n"
+    # FIXME: There are some issues here: this requires gcc and an unix-like environment. What about icc, clang etc.? :-(
+    have_libzip=`echo "#include <zip.h>" | gcc -c -o /dev/null -Werror -xc - > /dev/null 2>/dev/null && echo "true" || echo "false"`
+    libzip_libs='-lzip'
+fi
+
+printf "Looking for libzip....... "
+if ! $have_libzip; then
+    printf "No\n"
     echo "WARNING: libzip library not found!"
     echo "libzip is highly recommended and was not found on this system. Please install the libzip packet(s) for your system." 
     use_npz=false
-fi 
+else
+    printf "Yes, found libzip. "
+    if ! $use_npz; then
+        printf "But it will not be used!"
+    fi
+    printf "\n"
+fi
 
+#### Logic for finding pkg-config directory ####
+if $have_pkg_config; then
+    pc_path=none
+    pc_paths=`pkg-config --variable pc_path pkg-config`
+    directories=$(echo $pc_paths | tr ":" "\n")
+    for d in $directories; do
+        if [ -d $d ]; then
+            pc_path=$d
+            break
+        fi
+    done
+    printf "Install path for pkg-config .pc files: %s\n" $pc_path
+fi
+
+if [ ! -d $prefix ]; then
+    echo "WARNING: PREFIX directory ($prefix) not found. Make sure you really want"
+    echo "to install in $prefix, or rerun configure with --prefix option." 
+fi
+
+#### Create the makefile ####
 echo 'generating Makefile ...'
-echo "PREFIX  = $prefix" >Makefile
+echo "target_lib   = lib${projectname}"     >Makefile
+echo "PREFIX       = $prefix"              >>Makefile
 if $debugsym; then
-    echo 'dbg     = -g' >>Makefile
+    echo 'dbg          = -g'               >>Makefile
 fi
 if $profilesym; then
-    echo 'profile = -pg' >>Makefile
+    echo 'profile      = -pg'              >>Makefile
 fi
-echo "shared  = $shared" >> Makefile
-echo "use_npz = $use_npz" >> Makefile
-echo "include Makefile.in" >>Makefile
-echo "configuration complete, type 'make' to build."
+echo "shared       = $shared"              >>Makefile 
+
+echo "use_npz      = $use_npz"             >>Makefile
+if $use_npz; then    
+	echo 'src          = $(wildcard *.c)'  >>Makefile
+    echo "LIBS         = $libzip_libs"     >>Makefile
+else
+	echo 'src          = npy_array.c'      >>Makefile
+fi
+
+echo 'header_files = $(wildcard *.h)'      >>Makefile
+
+if $have_pkg_config; then
+    echo 'pkg_conf_pc   = npy_array.pc'    >>Makefile 
+    echo "pkg_config_path = ${pc_path}"    >>Makefile
+fi
+    
+echo "include Makefile.in"                 >>Makefile
+echo "configure done, type 'make' to build."

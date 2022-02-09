@@ -1,17 +1,12 @@
 # This is a pretty much general Makefile for libraries
 
-target_lib = libnpy_array
-
 SHELL := /bin/bash
 
 CC      = gcc
-CFLAGS += -std=c99 -Wall -Wextra -O3 $(dbg) $(profile)
-
-ifeq ($(use_npz), true) 
-	src = $(wildcard *.c)
-else
-	src = npy_array.c
-endif
+INCLUDE += -I.
+CFLAGS  += -std=c99 $(INCLUDE) -Wall -Wextra -O3 $(dbg) $(profile)
+SED     = sed
+RANLIB  = ranlib
 
 obj = $(src:.c=.o)
 dep = $(obj:.o=.d)  # one dependency file for each source
@@ -23,15 +18,17 @@ ifeq ($(shared), true)
 	CFLAGS += -fPIC
 else
 	target := $(addsuffix .a,$(target_lib))
+	strip_flags = --strip-unneeded
 endif
 
-all: $(target)
+all: $(target) $(pkg_conf_pc)
 
 %.a: $(obj)
 	$(AR) rcs $@ $^
+	$(RANLIB) $@ 
 
 %.so: $(obj)
-	$(CC) -shared -fPIC -o $@ $^ 
+	$(CC) -shared -fPIC -o $@ $^ $(LIBS)
 
 -include $(dep)   # include all dep files in the makefile
 
@@ -40,26 +37,39 @@ all: $(target)
 %.d: %.c
 	@$(CPP) $(CFLAGS) $< -MM -MT $(@:.d=.o) >$@
 
+%.pc: %.pc.in
+	@echo 'Building pkg-config file: $@'
+	@$(SED) \
+		-e 's|@PREFIX@|${PREFIX}|g' \
+		-e 's|@bindir@|${PREFIX}/bin|g' \
+		-e 's|@libdir@|${PREFIX}/lib|g' \
+		-e 's|@includedir@|${PREFIX}/include|g' \
+		-e 's|@PKG_CONFIG_RPATH@|${PKG_CONFIG_RPATH}|g' \
+		-e 's|@PROJECT_VERSION@|${PROJECT_VERSION}|g' \
+		-e 's|@LIBS@|${LIBS}|g' \
+	   	$< >$@
+
 .PHONY: clean
 clean: cleandep
-	$(RM) $(obj) $(target)
+	@$(RM) $(obj) $(target) $(pkg_conf_pc)  && echo 'Deleting object files and $(target)'
 
 .PHONY: cleandep
 cleandep:
-	$(RM) $(dep)
+	@$(RM) $(dep) && echo 'Deleting dep. files'
 
 .PHONY: install
-install: $(target)
-	mkdir -p $(DESTDIR)$(PREFIX)/lib
-	mkdir -p $(DESTDIR)$(PREFIX)/include
-	cp $(target) $(DESTDIR)$(PREFIX)/lib/$(target)
-	strip $(DESTDIR)$(PREFIX)/lib/$(target)
-	cp npy_array.h $(DESTDIR)$(PREFIX)/include/
-	cp npy_array_list.h $(DESTDIR)$(PREFIX)/include/
+install: $(target) $(header_files) $(pkg_conf_pc)
+	@mkdir -p $(DESTDIR)$(PREFIX)/lib
+	@mkdir -p $(DESTDIR)$(PREFIX)/include
+	@cp $(target) $(DESTDIR)$(PREFIX)/lib/$(target)
+	@echo 'Copying $(target)'
+	@strip $(strip_flags) $(DESTDIR)$(PREFIX)/lib/$(target)
+	@for h in $(header_files); do cp $$h $(DESTDIR)$(PREFIX)/include/ ; echo "Copying $$h"; done
+	@if [ -e $(pkg_conf_pc) ]; then cp $(pkg_conf_pc) $(pkg_config_path); fi
 
 .PHONY: uninstall
 uninstall:
-	$(RM) $(DESTDIR)$(PREFIX)/lib/$(target)
-	$(RM) $(DESTDIR)$(PREFIX)/include/npy_array.h
-	$(RM) $(DESTDIR)$(PREFIX)/include/npy_array_list.h
-
+	@$(RM) $(DESTDIR)$(PREFIX)/lib/$(target) && echo 'Removing $(target)'
+	@for h in $(header_files); do $(RM) $(DESTDIR)$(PREFIX)/include/$$h ; echo "Removing $$h"; done
+	@$(RM) $(pkg_config_path)/$(pkg_conf_pc) && echo 'Removing $(pkg_conf_pc)'
+	

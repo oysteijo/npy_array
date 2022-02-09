@@ -1,0 +1,12 @@
+prefix=@PREFIX@
+exec_prefix=${prefix}
+bindir=@bindir@
+libdir=@libdir@
+includedir=@includedir@
+
+Name: npy_array
+Description: C library for handling numpy .npy and .npz files
+Version: @PROJECT_VERSION@
+Libs: @PKG_CONFIG_RPATH@ -L${libdir} -lnpy_array
+Libs.private: @LIBS@
+Cflags: -I${includedir}
