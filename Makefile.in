@@ -58,6 +58,7 @@ cleandep:
 	@$(RM) $(dep) && echo 'Deleting dep. files'
 
 .PHONY: install
+
 install: $(target) $(header_files) $(pkg_conf_pc)
 	@mkdir -p $(DESTDIR)$(PREFIX)/lib
 	@mkdir -p $(DESTDIR)$(PREFIX)/include

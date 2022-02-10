@@ -1,4 +1,5 @@
 # npy_array
+## An ANSI C library for handling numpy arrays
 
 A simple library for reading and writing _Numpy_ arrays in C code. It is independent
 of _Python_ both compile time and runtime.
@@ -15,6 +16,10 @@ that can be opened in a C implemented neural network.
 
 Credit should also go to _Just Jordi Castells_, and [his blogpost](http://jcastellssala.com/2014/02/01/npy-in-c/),
 which inspired me to write this.
+
+### License
+
+This software is licensed unde BSD (3 clause) license.
 
 ### New of summer 2021
 
