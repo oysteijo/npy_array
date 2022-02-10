@@ -1,26 +1,26 @@
 # npy_array
 
-A simple library for reading and writing numpy arrays in C code. It is independent
-of Python both compile time and runtime.
+A simple library for reading and writing _Numpy_ arrays in C code. It is independent
+of _Python_ both compile time and runtime.
 
-This tiny C library can read and write Numpy arrays files (`.npy`) into memory and keep it
+This tiny C library can read and write _Numpy_ arrays files (`.npy`) into memory and keep it
 in a C structure. There is no matrix operations available, just reading and
 writing. There is not even methods to set and get elements of the array.
 
-The idea is that you can use `cblas` or something similar for the matrix
+The idea is that you can use _cblas_ or something similar for the matrix
 operations. I therefore have no intentions of adding such features.
 
-I wrote this to be able to pass Keras saved neural network weight into a format
+I wrote this to be able to pass _Keras_ saved neural network weight into a format
 that can be opened in a C implemented neural network.
 
-Credit should also go to Just Jordi Castells, and [his blogpost](http://jcastellssala.com/2014/02/01/npy-in-c/),
+Credit should also go to _Just Jordi Castells_, and [his blogpost](http://jcastellssala.com/2014/02/01/npy-in-c/),
 which inspired me to write this.
 
 ### New of summer 2021
 
-The archive (`.npz`) files are now handeled by [libzip](https://libzip.org/). This redesign
-creates a dependency of libzip of course, but it simplifies the code a lot. It also makes it
-possible to read and save compressed numpy arrays. It is therefore added a new public function:
+The archive (`.npz`) files are now handled by [_libzip_](https://libzip.org/). This redesign
+creates a dependency of _libzip_ of course, but it simplifies the code a lot. It also makes it
+possible to read and save compressed _Numpy_ arrays. It is therefore added a new public function:
 
     int
     npy_array_list_save_compressed( const char       *filename,
@@ -29,12 +29,12 @@ possible to read and save compressed numpy arrays. It is therefore added a new p
                                     zip_uint32_t      comp_flags);
 
 This new public function will save a `.npz` file using compression based on `comp` and
-`comp_flags` which are the same parameters as in libzip. 
+`comp_flags` which are the same parameters as in _libzip_. 
 
 ### Important message if you've used this library before 15th Feb 2020.
-I have made some changes huge changes to this library mid february 2020. The main
+I have made some changes huge changes to this library mid February 2020. The main
 data structure is renamed from `cmatrix_t` to `npy_array_t` to illustrate better that
-this is a numpy n-dimentional array that is available in C. The structures members
+this is a _Numpy_ n-dimensional array that is available in C. The structures members
 are all the same when it comes to names and types.
 
 The API calls has been changed to reflect the data structure name change. All functions
@@ -47,12 +47,12 @@ are renamed.
 | c_npy_matrix_write_file| npy_array_save |
 | c_npy_matrix_free      | npy_array_free |
 
-The new names are shorter and more decriptive.
+The new names are shorter and more descriptive.
 
 The next big change is that loading `.npz` files no longer returns an array of pointers to
-npy_arrays. It will now return a special linked list structure of numpy arrays, `npy_array_list_t`.
+npy_arrays. It will now return a special linked list structure of _Numpy_ arrays, `npy_array_list_t`.
 
-The API calls for `.npz`  has also been changed accoringly.
+The API calls for `.npz`  has also been changed accordingly.
 
 | Old name                 | New name             |
 |--------------------------|----------------------|
@@ -108,7 +108,7 @@ Here is a really simple example. You can compile this with:
     gcc -std=gnu99 -Wall -Wextra -O3 -c example.c
     gcc -o example example.o npy_array.o
 
-You can the run example with a numpy file as argument.
+You can then run example with a _Numpy_ file as argument.
 
     #include "npy_array.h"
     int main(int argc, char *argv[])
@@ -124,18 +124,17 @@ You can the run example with a numpy file as argument.
 ## Compilation/Install
 There is now a simple configure file provided (NOT autoconf/automake generated). From scratch:
 
-    ./configure
+    ./configure --prefix=/usr/local/
     make
+    sudo make install
 
-This will build a static library `libnpy_array.a` which can be linked in to your executable
-with the `-lnpy_array` option to the linker. Since this is such alpha stage, I do not
-recommend to install this.
+Please see the `INSTALL.md` file for further compilation options.
 
 ## Status
 This is written in a full hurry one afternoon, and then modified over some time.
 There isn't much of testing performed, and you can read the code to see what is does.
-All errors are written to STDERR. Consider this alpha. So, reading and writing of
-both `.npy` and `.npz` files seems to work OK -- some obvious bugs of course -- 
+All errors are written to STDERR. So, reading and writing of both `.npy` and `.npz`
+files seems to work OK -- some obvious bugs of course -- 
 
 ## TODO
  * Bugfixes
