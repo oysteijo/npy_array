@@ -2,7 +2,7 @@
  
 npy_array - C library for handling numpy arrays
  
-Copyright (C) 2020-2021 
+Copyright (C) 2020-2022 
 
    Øystein Schønning-Johansen <oysteijo@gmail.com>
 
@@ -53,10 +53,13 @@ typedef struct _npy_array_t {
     char              typechar;
     size_t            elem_size;
     bool              fortran_order;
+    void             *map_addr;      /* pointer to the map if array is mmap()'ed -- else NULL */
+    size_t            map_len;       /* length of memory area mapped (if mmap()'ed -- else 0 */
 } npy_array_t;
 
 
 npy_array_t*      npy_array_load       ( const char *filename );
+npy_array_t*      npy_array_mmap       ( const char *filename );
 void              npy_array_dump       ( const npy_array_t *m );
 void              npy_array_save       ( const char *filename, const npy_array_t *m );
 void              npy_array_free       ( npy_array_t *m );

@@ -2,7 +2,7 @@
 
 npy_array - C library for handling numpy arrays
  
-Copyright (C) 2020-2021 
+Copyright (C) 2020-2022 
 
    Øystein Schønning-Johansen <oysteijo@gmail.com>
 
