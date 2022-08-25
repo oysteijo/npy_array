@@ -53,6 +53,7 @@ typedef struct _npy_array_t {
     char              typechar;
     size_t            elem_size;
     bool              fortran_order;
+    /* Consider map_addr as a private member. Do modify this pointer! Used for unmap() */
     void             *map_addr;      /* pointer to the map if array is mmap()'ed -- else NULL */
 } npy_array_t;
 
