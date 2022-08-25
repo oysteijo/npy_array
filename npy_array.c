@@ -324,7 +324,6 @@ npy_array_t * npy_array_mmap( const char *filename )
         fprintf(stderr, "Cannot read matrix.\n");
         munmap( data, len );
     }
-    m->map_len = len;
     return m;
 
 }
@@ -384,18 +383,13 @@ void npy_array_free( npy_array_t *m )
 
     if( m->map_addr ){
         /* We need the length of the data mapped. We are mapping the whole file, so we have to
-           either store the size as it is mapped, or recalculate the size.
-
-           As a recalculaton can go wrong, I will initally do both, and make sure they are the
-           same. I can then remove the stored length. 
-        */
+           recalculate the size.  */
         uint16_t header_length = 0;
         char *preheader = m->map_addr;
         header_length |= preheader[NPY_ARRAY_HEADER_LENGTH_LOW_IDX];
         header_length |= preheader[NPY_ARRAY_HEADER_LENGTH_HIGH_IDX] << 8;
 
         size_t len = NPY_ARRAY_PREHEADER_LENGTH + header_length + npy_array_calculate_datasize(m);
-        assert( len == m->map_len );
         munmap( m->map_addr, len );
     } else
         free( m->data );

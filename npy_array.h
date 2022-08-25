@@ -54,7 +54,6 @@ typedef struct _npy_array_t {
     size_t            elem_size;
     bool              fortran_order;
     void             *map_addr;      /* pointer to the map if array is mmap()'ed -- else NULL */
-    size_t            map_len;       /* length of memory area mapped (if mmap()'ed -- else 0 */
 } npy_array_t;
 
 

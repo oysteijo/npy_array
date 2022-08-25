@@ -19,7 +19,36 @@ which inspired me to write this.
 
 ### License
 
-This software is licensed unde BSD (3 clause) license.
+This software is licensed under BSD (3 clause) license.
+
+### New of summer 2022
+
+Added support for memory mapping (`mmap()`) of arrays instead of reading them into memory.
+So far this feature will only map a `.npy` file read-only in shared and protected memory.
+In that sense it is useful for retrieving data from large pre-calculated arrays. There are
+several advantages of this: The memory for the file is mapped by the OS, such that the
+memory footprint of the running process becomes much smaller, several processes can share
+the mapped memory as several processes reads from the same file, and it is much faster as
+the file is not read into virtual memory.
+
+The API for mapping, is similar to to loading a file. It's just one more construction function:
+
+    npy_array_t * npy_array_mmap( const char *filename );
+
+It cannot be simpler than that. If you are sure you only need the data to be read only, you can
+actually just use this function as a drop-in replacement to `npy_array_load()`. When you are
+done with the array, you should be release its resources by calling `npy_array_free( array );`.
+
+There is also a new member in the `npy_array_t` structure: `void *map_addr;`. Do not use this.
+Consider it _private_. Do not alter it, as it is used for unmapping when cleaning up.
+
+There are currently no plan to support writing to mmap()'ed arrays. If you need such feature,
+please make a pull request, and I will probably merge.
+
+There is also no plan to support memory mapping for `.npz` files.
+
+(Also: `mmap()` is actually POSIX standard and not ANSI. If ANSI compatibility 
+is important to you, maybe compile with out these feature.)
 
 ### New of summer 2021
 
@@ -94,6 +123,7 @@ The API is really simple. There is only ten public functions:
 
     /* These are the four functions for loading and saving .npy files */
     npy_array_t*      npy_array_load        ( const char *filename);
+    npy_array_t*      npy_array_mmap        ( const char *filename);
     void              npy_array_dump        ( const npy_array_t *m );
     void              npy_array_save        ( const char *filename, const npy_array_t *m );
     void              npy_array_free        ( npy_array_t *m );
