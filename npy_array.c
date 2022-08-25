@@ -2,7 +2,7 @@
  
 npy_array - C library for handling numpy arrays
  
-Copyright (C) 2020-2021 
+Copyright (C) 2020-2022 
 
    Øystein Schønning-Johansen <oysteijo@gmail.com>
 
@@ -38,6 +38,9 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "npy_array.h"
 
 #include <stdio.h>
+#include <unistd.h>
+#include <fcntl.h>
+#include <sys/mman.h>
 #include <string.h>
 #include <ctype.h>
 #include <assert.h>
@@ -56,6 +59,13 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #define NPY_ARRAY_MAGIC_LENGTH 6
 #define NPY_ARRAY_VERSION_HEADER_LENGTH 4
 #define NPY_ARRAY_PREHEADER_LENGTH (NPY_ARRAY_MAGIC_LENGTH + NPY_ARRAY_VERSION_HEADER_LENGTH)
+
+static int64_t read_mapped( void *map, void *buffer, uint64_t nbytes );
+typedef struct _map_handler_t {
+    char *start_pos;
+    char *current_pos;
+    size_t length;
+} map_handler_t;
 
 size_t npy_array_get_header( const npy_array_t *m,  char *buf )
 {
@@ -237,6 +247,13 @@ npy_array_t * _read_matrix( void *fp, reader_func read_func )
 #if VERBOSE
     printf("Number of elements: %llu\n", (unsigned long long) n_elements );
 #endif
+    m->map_addr = NULL;
+    if( read_func == read_mapped ){
+        map_handler_t *mh = (map_handler_t*) fp;
+        m->data = mh->current_pos;
+        m->map_addr = mh->start_pos;
+        return m;
+    }
 
     m->data = malloc( n_elements * m->elem_size );
     if ( !m->data ){
@@ -269,6 +286,46 @@ npy_array_t * npy_array_load( const char *filename )
 
     fclose(fp);
     return m;
+}
+
+static int64_t read_mapped( void *map, void *buffer, uint64_t nbytes )
+{
+    map_handler_t *mh = (map_handler_t*) map;
+    size_t offset = mh->current_pos - mh->start_pos;
+    assert( mh->length >= offset );
+    size_t bytes_left = mh->length - offset;
+    size_t bytes_to_read = bytes_left > nbytes ? nbytes : bytes_left;
+    memcpy( buffer, mh->current_pos, bytes_to_read );
+    mh->current_pos += bytes_to_read;
+    return (int64_t) nbytes;
+}
+
+npy_array_t * npy_array_mmap( const char *filename )
+{
+    int fd = -1;
+    if( (fd = open( filename, O_RDONLY  )) == -1 ){
+        perror( filename );
+        return NULL;
+    }
+
+    off_t len = lseek( fd, 0, SEEK_END );
+
+    char *data = mmap( 0, len, PROT_READ,MAP_SHARED, fd, 0);
+    close( fd );
+    if( data == MAP_FAILED ){
+        perror("mmap failed!");
+        return NULL;
+    }
+
+    map_handler_t mh = { .start_pos = (char*) data, .current_pos = (char*) data, .length = len };
+
+    npy_array_t *m = _read_matrix( &mh, &read_mapped);
+    if(!m) {
+        fprintf(stderr, "Cannot read matrix.\n");
+        munmap( data, len );
+    }
+    return m;
+
 }
 
 void npy_array_dump( const npy_array_t *m )
@@ -324,6 +381,18 @@ void npy_array_free( npy_array_t *m )
         return;
     }
 
-    free( m->data );
+    if( m->map_addr ){
+        /* We need the length of the data mapped. We are mapping the whole file, so we have to
+           recalculate the size.  */
+        uint16_t header_length = 0;
+        char *preheader = m->map_addr;
+        header_length |= preheader[NPY_ARRAY_HEADER_LENGTH_LOW_IDX];
+        header_length |= preheader[NPY_ARRAY_HEADER_LENGTH_HIGH_IDX] << 8;
+
+        size_t len = NPY_ARRAY_PREHEADER_LENGTH + header_length + npy_array_calculate_datasize(m);
+        munmap( m->map_addr, len );
+    } else
+        free( m->data );
+
     free( m );
 }
