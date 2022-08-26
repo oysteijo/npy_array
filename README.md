@@ -156,6 +156,57 @@ You can then run example with a _Numpy_ file as argument.
         return 0;
     }
 
+## Saving other arraylike data as NumPy format.
+You may have a pointer to an N-dimensional array, which you want to store as NumPy format, such
+that you can load it in Python/Jupiter and plot in matplotlib or whatever you find more
+convenient in Python.
+
+The data structure for `npy_array_t` is open and for convenience you can make a new structure
+by stack allocation. Here is some example code on how you can save a `.npy` file:
+
+    #include <npy_array.h>
+    #include <stdlib.h>
+    int main()
+    {
+        /* set some sizes */
+        int n_rows = 4;
+        int n_cols = 3;
+    
+        /* Allocate the raw data - this can be from a blas or another */
+        float *arraydata = malloc( n_rows * n_cols * sizeof( float ));
+    
+        /* fill in some data */
+        for( int i = 0; i < n_rows * n_cols; i++ )
+            arraydata[i] = (float) i;
+    
+        npy_array_t array = {
+            .data = (char*) arraydata,
+            .shape = { n_rows, n_cols },
+            .ndim = 2,
+            .endianness = '<',
+            .typechar = 'f',
+            .elem_size = sizeof(float),
+        };
+        npy_array_save( "my_4_by_3_array.npy", &array );
+        free ( arraydata );
+        return 0;
+    }
+
+Compile:
+
+    gcc -std=c99 -Wall -Wextra -O3 how_to_save.c -o how_to_save `pkg-config --libs npy_array`
+
+When this is then executed, you can verify that you got the save `.npy` file and that
+it's possible to read this in Python/NumPy.
+
+    >>> import numpy as np
+    >>> a = np.load("my_4_by_3_array.npy")
+    >>> a
+    array([[ 0.,  1.,  2.],
+           [ 3.,  4.,  5.],
+           [ 6.,  7.,  8.],
+           [ 9., 10., 11.]], dtype=float32)
+
 ## Compilation/Install
 There is now a simple configure file provided (NOT autoconf/automake generated). From scratch:
 
