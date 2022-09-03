@@ -78,4 +78,34 @@ static inline int64_t read_file( void *fp, void *buffer, uint64_t nbytes )
    Don't use it now as I will change name of it in case I make it public. */
 typedef int64_t (*reader_func)( void *fp, void *buffer, uint64_t nbytes );
 npy_array_t *     _read_matrix( void *fp, reader_func read_func );
+
+#define _NARG( ...) _NARG_(__VA_ARGS__,8,7,6,5,4,3,2,1,0)
+#define _NARG_(...) _ARG_N(__VA_ARGS__)
+#define _ARG_N(_1,_2,_3,_4,_5,_6,_7,_8,N,...) N
+
+#define SHAPE(...) .shape = {__VA_ARGS__}, .ndim = _NARG(__VA_ARGS__)
+#define NPY_ARRAY_BUILDER(_data,_shape,...) \
+    &(npy_array_t){ .data=(char*)_data, _shape, __VA_ARGS__ } 
+
+#define NPY_DTYPE_FLOAT16    .typechar='f', .elem_size=2
+#define NPY_DTYPE_FLOAT32    .typechar='f', .elem_size=4
+#define NPY_DTYPE_FLOAT64    .typechar='f', .elem_size=8
+#define NPY_DTYPE_FLOAT128   .typechar='f', .elem_size=16
+
+#define NPY_DTYPE_INT8       .typechar='i', .elem_size=1
+#define NPY_DTYPE_INT16      .typechar='i', .elem_size=2
+#define NPY_DTYPE_INT32      .typechar='i', .elem_size=4
+#define NPY_DTYPE_INT64      .typechar='i', .elem_size=8
+
+#define NPY_DTYPE_UINT8      .typechar='u', .elem_size=1
+#define NPY_DTYPE_UINT16     .typechar='u', .elem_size=2
+#define NPY_DTYPE_UINT32     .typechar='u', .elem_size=4
+#define NPY_DTYPE_UINT64     .typechar='u', .elem_size=8
+
+#define NPY_DTYPE_COMPLEX64  .typechar='c', .elem_size=8
+#define NPY_DTYPE_COMPLEX128 .typechar='c', .elem_size=16
+#define NPY_DTYPE_COMPLEX256 .typechar='c', .elem_size=32
+
+#define NPY_DTYPE_BOOL       .typechar='b', .elem_size=1
+
 #endif  /* __NPY_ARRAY_H__ */

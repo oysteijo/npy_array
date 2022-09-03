@@ -67,6 +67,19 @@ typedef struct _map_handler_t {
     size_t length;
 } map_handler_t;
 
+/* If the endianness can be omitted, that would be very nice. Let's make a guess
+   if it isn't set. */
+static inline char _guess_endianness( const npy_array_t *m )
+{
+    if( (!strchr( "<>|", (int)  m->endianness) || (m->endianness==0) )){
+        if( m->elem_size == 1) return '|';
+        if( m->typechar == 'S') return '|';
+        int val = 1;
+        return (*(char *)&val == 1) ? '<' : '>';
+    } else 
+        return m->endianness;
+}
+
 size_t npy_array_get_header( const npy_array_t *m,  char *buf )
 {
     char *p = buf;
@@ -101,7 +114,7 @@ size_t npy_array_get_header( const npy_array_t *m,  char *buf )
 #define HEADER_LEN 108
     /* WARNING: This code looks inocent and simple, but it was really a struggle. Do not touch unless you like pain! */
     size_t len = sprintf(dict, "{'descr': '%c%c%zu', 'fortran_order': %s, 'shape': (%s), }",
-            m->endianness,
+            _guess_endianness( m ),
             m->typechar,
             m->elem_size,
             m->fortran_order ? "True": "False",
@@ -203,17 +216,6 @@ npy_array_t * _read_matrix( void *fp, reader_func read_func )
     /* FIXME: Check the **endptr (second argument which is still NULL here)*/
     m->elem_size = (size_t) strtoll( &descr[2], NULL, 10);
     assert( m->elem_size > 0 );
-
-#if 0
-    if(descr[0] == '<') printf("Little Endian\n");
-    if(descr[0] == '>') printf("Big Endian (Be carefull)\n");
-    if(descr[0] == '|') printf("Not relevant endianess\n");
-
-    if(descr[1] == 'f') printf("float number\n");
-    if(descr[1] == 'i') printf("integer number\n");
-
-    printf("each item is %d bytes.\n", (int) m->elem_size );
-#endif
 
     /* FIXME: This only works if there is one and only one leading spaces. */
     char *fortran = find_header_item("'fortran_order': ", header);
@@ -325,7 +327,6 @@ npy_array_t * npy_array_mmap( const char *filename )
         munmap( data, len );
     }
     return m;
-
 }
 
 void npy_array_dump( const npy_array_t *m )
