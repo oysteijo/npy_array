@@ -119,7 +119,7 @@ And the linked list structure for `.npz` files:
     } npy_array_list_t;
 
 ## API
-The API is really simple. There is only ten public functions:
+The API is really simple. There is only -ten- eleven public functions:
 
     /* These are the four functions for loading and saving .npy files */
     npy_array_t*      npy_array_load        ( const char *filename);
@@ -179,16 +179,10 @@ by stack allocation. Here is some example code on how you can save a `.npy` file
         for( int i = 0; i < n_rows * n_cols; i++ )
             arraydata[i] = (float) i;
     
-        npy_array_t array = {
-            .data = (char*) arraydata,
-            .shape = { n_rows, n_cols },
-            .ndim = 2,
-            .endianness = '<',
-            .typechar = 'f',
-            .elem_size = sizeof(float),
-        };
-        npy_array_save( "my_4_by_3_array.npy", &array );
-        free ( arraydata );
+        npy_array_save( "my_4_by_3_array.npy", 
+            NPY_ARRAY_BUILDER( arraydata, SHAPE( n_rows, n_cols ), NPY_DTYPE_FLOAT32 ) );
+        
+        free( arraydata );
         return 0;
     }
 
