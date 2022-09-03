@@ -1,4 +1,4 @@
-### Somw simple examples.
+## Some simple examples.
 
 This directory contain some examples of how to save and load Numpy arrays with this library.
 
@@ -12,17 +12,17 @@ This will build four executables in the same directory.
 
 Please study the code in `how_to_save.c`. If you run the code it will generate two `.npy` files.
 
- * my_4_by_3_array.npy
- * my_4_by_3_array_shortcut.npy
+ * `my_4_by_3_array.npy`
+ * `my_4_by_3_array_shortcut.npy`
 
-Please open an Python REPL, and make sure you can read these.
+Please open a Python REPL, and make sure you can read these.
 
 #### `how_to_save_npz`
 
 Please study the code in `how_to_save_npz.c`. If you run the code it will generate a `.npz` file
 containing two NumPy arrays. 
 
-Please open an Python REPL, and make sure you can read the `.npz` file, and that the arrays
+Please open a Python REPL, and make sure you can read the `.npz` file, and that the arrays
 looks sensible.
 
 #### `how_to_load`
@@ -40,8 +40,15 @@ You can also try to generate a NumPy file from your Python REPL, and load it wit
 
 #### `how_to_load_npz`
 
-Please sudy the code in `how_to_load_npz.c`. It loads a `.npz` file into memory and returns
-all arrays in a linked list. Loading with `npy_array_list_load()` allocate all memory
-for all holding list structures, all npy_array structures and the numeric data itself.
-Later calling `npy_array_list_free()` on the head element of the list, will free everything.
+Please study the code in `how_to_load_npz.c`. It loads a `.npz` file into memory and returns
+all arrays in a linked list.
 
+You can run the example with the `.npz`file generated my `how_to_save_npz`:
+
+    $ ./how_to_load_npz iarray_and_darray.npz
+
+You can also create a `.npz` file from your Python REPL, and check that it can be read as well.
+
+Loading with `npy_array_list_load()` allocate all memory for all holding list structures,
+all npy_array structures and all the numeric data itself. Later calling `npy_array_list_free()` with
+the head element of the list as argument, will free __everything__.
