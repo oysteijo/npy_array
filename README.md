@@ -1,10 +1,10 @@
 # npy_array
-## An ANSI C library for handling numpy arrays
+## An ANSI C library for handling NumPy arrays
 
-A simple library for reading and writing _Numpy_ arrays in C code. It is independent
+A simple library for reading and writing _NumPy_ arrays in C code. It is independent
 of _Python_ both compile time and runtime.
 
-This tiny C library can read and write _Numpy_ arrays files (`.npy`) into memory and keep it
+This tiny C library can read and write _NumPy_ arrays files (`.npy`) into memory and keep it
 in a C structure. There is no matrix operations available, just reading and
 writing. There is not even methods to set and get elements of the array.
 
@@ -54,7 +54,7 @@ is important to you, maybe compile with out these feature.)
 
 The archive (`.npz`) files are now handled by [_libzip_](https://libzip.org/). This redesign
 creates a dependency of _libzip_ of course, but it simplifies the code a lot. It also makes it
-possible to read and save compressed _Numpy_ arrays. It is therefore added a new public function:
+possible to read and save compressed _NumPy_ arrays. It is therefore added a new public function:
 
     int
     npy_array_list_save_compressed( const char       *filename,
@@ -68,7 +68,7 @@ This new public function will save a `.npz` file using compression based on `com
 ### Important message if you've used this library before 15th Feb 2020.
 I have made some changes huge changes to this library mid February 2020. The main
 data structure is renamed from `cmatrix_t` to `npy_array_t` to illustrate better that
-this is a _Numpy_ n-dimensional array that is available in C. The structures members
+this is a _NumPy_ n-dimensional array that is available in C. The structures members
 are all the same when it comes to names and types.
 
 The API calls has been changed to reflect the data structure name change. All functions
@@ -84,7 +84,7 @@ are renamed.
 The new names are shorter and more descriptive.
 
 The next big change is that loading `.npz` files no longer returns an array of pointers to
-npy_arrays. It will now return a special linked list structure of _Numpy_ arrays, `npy_array_list_t`.
+npy_arrays. It will now return a special linked list structure of _NumPy_ arrays, `npy_array_list_t`.
 
 The API calls for `.npz`  has also been changed accordingly.
 
@@ -119,7 +119,7 @@ And the linked list structure for `.npz` files:
     } npy_array_list_t;
 
 ## API
-The API is really simple. There is only -ten- eleven public functions:
+The API is really simple. There is only ~~ten~~eleven public functions:
 
     /* These are the four functions for loading and saving .npy files */
     npy_array_t*      npy_array_load        ( const char *filename);
@@ -128,7 +128,7 @@ The API is really simple. There is only -ten- eleven public functions:
     void              npy_array_save        ( const char *filename, const npy_array_t *m );
     void              npy_array_free        ( npy_array_t *m );
     
-    /* These are the six functions for loading and saving .npz files and lists of numpy arrays */
+    /* These are the six functions for loading and saving .npz files and lists of NumPy arrays */
     npy_array_list_t* npy_array_list_load   ( const char *filename );
     int               npy_array_list_save   ( const char *filename, npy_array_list_t *array_list );
     size_t            npy_array_list_length ( npy_array_list_t *array_list);
@@ -143,7 +143,7 @@ Here is a really simple example. You can compile this with:
     gcc -std=gnu99 -Wall -Wextra -O3 -c example.c
     gcc -o example example.o npy_array.o
 
-You can then run example with a _Numpy_ file as argument.
+You can then run example with a _NumPy_ file as argument.
 
     #include "npy_array.h"
     int main(int argc, char *argv[])
@@ -156,7 +156,7 @@ You can then run example with a _Numpy_ file as argument.
         return 0;
     }
 
-## Saving other arraylike data as NumPy format.
+## Saving other arraylike data as _NumPy_ format.
 You may have a pointer to an N-dimensional array, which you want to store as NumPy format, such
 that you can load it in Python/Jupiter and plot in matplotlib or whatever you find more
 convenient in Python.
