@@ -12,6 +12,8 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+    - name: install libzip
+      run:  apt install libzip-dev
     - uses: actions/checkout@v3
     - name: configure
       run: ./configure
