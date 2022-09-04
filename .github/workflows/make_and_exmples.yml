@@ -13,7 +13,7 @@ jobs:
 
     steps:
     - name: install libzip
-      run:  apt install libzip-dev
+      run:  sudo apt install -y libzip-dev
     - uses: actions/checkout@v3
     - name: configure
       run: ./configure
