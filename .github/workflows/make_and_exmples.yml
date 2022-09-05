@@ -26,6 +26,8 @@ jobs:
     - name: Run examples
       run: |
          cd example
+         # Since the library is not installed (maybe test that as well?) We must set LD_LIBRARY_PATH
+         export LD_LIBRARY_PATH=./..
          ./how_to_save
          diff my_4_by_3_array_shortcut.npy my_4_by_3_array.npy
          ./how_to_save_npz
