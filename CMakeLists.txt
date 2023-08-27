@@ -15,6 +15,10 @@ FetchContent_MakeAvailable(libzip)
 get_cmake_property(_variableNames VARIABLES)
 list(SORT _variableNames)
 
+foreach(_variableName ${_variableNames})
+    message(STATUS "${_variableName}=${${_variableName}}")
+endforeach()
+
 add_library(npy_arrays STATIC
     npy_array.c
     npy_array.h
@@ -28,4 +32,4 @@ include_directories(
     ${libzip_BINARY_DIR}
 )
 
-target_link_libraries(npy_arrays libzip)
+target_link_libraries(npy_arrays zip)
