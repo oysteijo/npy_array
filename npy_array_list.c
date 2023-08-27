@@ -185,7 +185,7 @@ int npy_array_list_save_compressed( const char *filename, npy_array_list_t *arra
 
         int idx = zip_file_add( zip, iter->filename, s, ZIP_FL_ENC_UTF_8 );
         if( idx != n )
-            fprintf( stderr, "Warning: Index and counter mismatch.");
+            fprintf( stderr, "Warning: Index and counter mismatch.\n");
 
         // fprintf(stderr, "Error: %s\n", zip_strerror( zip ));
         
