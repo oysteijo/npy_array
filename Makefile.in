@@ -66,7 +66,7 @@ install: $(target) $(header_files) $(pkg_conf_pc)
 	@echo 'Copying $(target)'
 	@strip $(strip_flags) $(DESTDIR)$(PREFIX)/lib/$(target)
 	@for h in $(header_files); do cp $$h $(DESTDIR)$(PREFIX)/include/ ; echo "Copying $$h"; done
-	@sudo ldconfig
+	@if (( $EUID == 0 )); then ldconfig; fi
 	@if [ -e $(pkg_conf_pc) ]; then mkdir -p $(DESTDIR)$(pkg_config_path); cp $(pkg_conf_pc) $(DESTDIR)$(pkg_config_path) && echo "Copying $(pkg_conf_pc) to $(pkg_config_path)"; fi
 
 .PHONY: uninstall
