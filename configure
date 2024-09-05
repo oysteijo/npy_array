@@ -93,6 +93,7 @@ then
     have_libzip=`pkg-config --exists libzip && echo "true" || echo "false"`
     have_pkg_config=true
     libzip_libs=`pkg-config --libs libzip`
+    libzip_cflags=`pkg-config --cflags libzip`
 else
     printf "No, we do not have pkg-config!\n"
     # FIXME: There are some issues here: this requires gcc and an unix-like environment. What about icc, clang etc.? :-(
@@ -124,8 +125,13 @@ if $have_pkg_config; then
             pc_path=$d
             break
         fi
-    done
-    printf "Install path for pkg-config .pc files: %s\n" $pc_path
+    done;
+    if [ -z "${PKG_CONFIG_PATH}" ]; then
+        printf "Install path for pkg-config .pc files: %s\n" $pc_path
+    else
+        pc_path=${PKG_CONFIG_PATH}
+        printf "Install path for pkg-config .pc files: %s (PKG_CONFIG_PATH)\n" $pc_path
+    fi
 fi
 
 if [ ! -d $prefix ]; then
@@ -149,6 +155,7 @@ echo "use_npz      = $use_npz"             >>Makefile
 if $use_npz; then    
 	echo 'src          = $(wildcard *.c)'  >>Makefile
     echo "LIBS         = $libzip_libs"     >>Makefile
+    echo "INCLUDE      = $libzip_cflags"   >>Makefile
 else
 	echo 'src          = npy_array.c'      >>Makefile
 fi
