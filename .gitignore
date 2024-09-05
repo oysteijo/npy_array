@@ -3,3 +3,5 @@
 *~
 *.npy
 *.npz
+build/
+.DS_Store
