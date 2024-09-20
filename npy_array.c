@@ -45,7 +45,7 @@ IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include <ctype.h>
 #include <assert.h>
 
-#define NPY_ARRAY_MAGIC_STRING {0x93,'N','U','M','P','Y'}
+#define NPY_ARRAY_MAGIC_STRING {-109,'N','U','M','P','Y'}
 #define NPY_ARRAY_MAJOR_VERSION_IDX 6
 #define NPY_ARRAY_MINOR_VERSION_IDX 7
 
@@ -396,4 +396,16 @@ void npy_array_free( npy_array_t *m )
         free( m->data );
 
     free( m );
+}
+
+#define MIN( x, y ) ((x) < (y) ? (x) : (y))
+npy_array_t* npy_array_alloc( const npy_array_t* m ) {
+    npy_array_t* ary = calloc( 1, sizeof(*ary) );
+    ary->ndim = MIN( m->ndim, NPY_ARRAY_MAX_DIMENSIONS );
+    memcpy( ary->shape, m->shape, sizeof(ary->shape) );
+    ary->typechar = m->typechar;
+    ary->elem_size = m->elem_size;
+    ary->data = malloc( npy_array_calculate_datasize(ary) );
+    memcpy( ary->data, m->data, npy_array_calculate_datasize(ary) );
+    return ary;
 }

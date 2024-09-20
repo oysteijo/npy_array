@@ -119,11 +119,12 @@ And the linked list structure for `.npz` files:
     } npy_array_list_t;
 
 ## API
-The API is really simple. There is only ~~ten~~eleven public functions:
+The API is really simple. There is only ~~eleven~~twelve public functions:
 
     /* These are the four functions for loading and saving .npy files */
     npy_array_t*      npy_array_load        ( const char *filename);
     npy_array_t*      npy_array_mmap        ( const char *filename);
+    npy_array_t*      npy_array_alloc       ( const npy_array_t *m );
     void              npy_array_dump        ( const npy_array_t *m );
     void              npy_array_save        ( const char *filename, const npy_array_t *m );
     void              npy_array_free        ( npy_array_t *m );
@@ -154,6 +155,27 @@ You can then run example with a _NumPy_ file as argument.
         npy_array_save( "tester_save.npy", m);
         npy_array_free( m );
         return 0;
+    }
+
+## Saving lists of numpy arrays (and building them)
+Here is an example of saving multiple arrays into a single .npz file. You can
+compile this with:
+
+    gcc -O3 -Wall -Wextra -pedantic -std=c11 -c example_list.c
+    gcc -o example_list example_list.o npy_array.o npy_array_list.o -lzip
+
+You can the run example_list with a filename (_NumPy_ compressed) as argument.
+
+    #include "npy_array_list.h"
+    int main(int argc, char *argv[])
+    {
+        if( argc != 2 ) return -1;
+        double data[] = {0,1,2,3,4,5};
+        npy_array_list_t* list = NULL;
+        list = npy_array_list_append( list, NPY_ARRAY_ALLOCATOR(data, SHAPE(3,2), NPY_DTYPE_FLOAT64), "matrix" );
+        list = npy_array_list_append( list, NPY_ARRAY_ALLOCATOR(data, SHAPE(2,1,2), NPY_DTYPE_FLOAT64), "tensor" );
+        npy_array_list_save_compressed( argv[1], list, ZIP_CM_DEFAULT, 0 );
+        npy_array_list_free( list );
     }
 
 ## Saving other arraylike data as _NumPy_ format.
