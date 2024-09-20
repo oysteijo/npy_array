@@ -3,3 +3,7 @@
 *~
 *.npy
 *.npz
+Makefile
+*.so
+*.pc
+*.d
