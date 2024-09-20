@@ -60,7 +60,7 @@ typedef struct _npy_array_t {
 
 npy_array_t*      npy_array_load       ( const char *filename );
 npy_array_t*      npy_array_mmap       ( const char *filename );
-npy_array_t*      npy_array_alloc      ( const npy_array_t *m );
+npy_array_t*      npy_array_deepcopy   ( const npy_array_t *m );
 void              npy_array_dump       ( const npy_array_t *m );
 void              npy_array_save       ( const char *filename, const npy_array_t *m );
 void              npy_array_free       ( npy_array_t *m );
@@ -88,7 +88,7 @@ npy_array_t *     _read_matrix( void *fp, reader_func read_func );
 #define NPY_ARRAY_BUILDER(_data,_shape,...) \
     &(npy_array_t){ .data=(char*)_data, _shape, __VA_ARGS__ } 
 #define NPY_ARRAY_ALLOCATOR(...) \
-    npy_array_alloc(NPY_ARRAY_BUILDER(__VA_ARGS__))
+    npy_array_deepcopy(NPY_ARRAY_BUILDER(__VA_ARGS__))
 
 #define NPY_DTYPE_FLOAT16    .typechar='f', .elem_size=2
 #define NPY_DTYPE_FLOAT32    .typechar='f', .elem_size=4

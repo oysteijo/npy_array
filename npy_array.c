@@ -399,13 +399,22 @@ void npy_array_free( npy_array_t *m )
 }
 
 #define MIN( x, y ) ((x) < (y) ? (x) : (y))
-npy_array_t* npy_array_alloc( const npy_array_t* m ) {
+npy_array_t* npy_array_deepcopy( const npy_array_t* m ) {
     npy_array_t* ary = calloc( 1, sizeof(*ary) );
+    if (!ary) {
+        fprintf(stderr, "Cannot allocate data structure!\n");
+        return NULL;
+    }
     ary->ndim = MIN( m->ndim, NPY_ARRAY_MAX_DIMENSIONS );
     memcpy( ary->shape, m->shape, sizeof(ary->shape) );
     ary->typechar = m->typechar;
     ary->elem_size = m->elem_size;
     ary->data = malloc( npy_array_calculate_datasize(ary) );
+    if (!ary->data) {
+        fprintf(stderr, "Cannot allocate memory!\n");
+        free(ary);
+        return NULL;
+    }
     memcpy( ary->data, m->data, npy_array_calculate_datasize(ary) );
     return ary;
 }
