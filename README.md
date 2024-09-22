@@ -119,7 +119,7 @@ And the linked list structure for `.npz` files:
     } npy_array_list_t;
 
 ## API
-The API is really simple. There is only ~~eleven~~twelve public functions:
+The API is really simple. There is only 13 public functions:
 
     /* These are the four functions for loading and saving .npy files */
     npy_array_t*      npy_array_load        ( const char *filename);
