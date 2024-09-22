@@ -53,14 +53,16 @@ typedef struct _npy_array_t {
     char              typechar;
     size_t            elem_size;
     bool              fortran_order;
-    /* Consider map_addr as a private member. Do modify this pointer! Used for unmap() */
+    /* Consider map_addr and memory as a private members. Do not modify these pointers! */
     void             *map_addr;      /* pointer to the map if array is mmap()'ed -- else NULL */
+    char             *memory;        /* pointer to memory if array owns it -- else NULL */
 } npy_array_t;
 
 
 npy_array_t*      npy_array_load       ( const char *filename );
 npy_array_t*      npy_array_mmap       ( const char *filename );
 npy_array_t*      npy_array_deepcopy   ( const npy_array_t *m );
+npy_array_t*      npy_array_copy       ( const npy_array_t *m );
 void              npy_array_dump       ( const npy_array_t *m );
 void              npy_array_save       ( const char *filename, const npy_array_t *m );
 void              npy_array_free       ( npy_array_t *m );
@@ -87,7 +89,9 @@ npy_array_t *     _read_matrix( void *fp, reader_func read_func );
 #define SHAPE(...) .shape = {__VA_ARGS__}, .ndim = _NARG(__VA_ARGS__)
 #define NPY_ARRAY_BUILDER(_data,_shape,...) \
     &(npy_array_t){ .data=(char*)_data, _shape, __VA_ARGS__ } 
-#define NPY_ARRAY_ALLOCATOR(...) \
+#define NPY_ARRAY_BUILDER_COPY(...) \
+    npy_array_copy(NPY_ARRAY_BUILDER(__VA_ARGS__))
+#define NPY_ARRAY_BUILDER_DEEPCOPY(...) \
     npy_array_deepcopy(NPY_ARRAY_BUILDER(__VA_ARGS__))
 
 #define NPY_DTYPE_FLOAT16    .typechar='f', .elem_size=2

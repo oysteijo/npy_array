@@ -257,7 +257,7 @@ npy_array_t * _read_matrix( void *fp, reader_func read_func )
         return m;
     }
 
-    m->data = malloc( n_elements * m->elem_size );
+    m->memory = m->data = malloc( n_elements * m->elem_size );
     if ( !m->data ){
         fprintf(stderr, "Cannot allocate memory for matrix data.\n");
         free( m );
@@ -392,8 +392,9 @@ void npy_array_free( npy_array_t *m )
 
         size_t len = NPY_ARRAY_PREHEADER_LENGTH + header_length + npy_array_calculate_datasize(m);
         munmap( m->map_addr, len );
-    } else
-        free( m->data );
+    } else if ( m->memory ) {
+        free( m->memory );
+    }
 
     free( m );
 }
@@ -409,12 +410,26 @@ npy_array_t* npy_array_deepcopy( const npy_array_t* m ) {
     memcpy( ary->shape, m->shape, sizeof(ary->shape) );
     ary->typechar = m->typechar;
     ary->elem_size = m->elem_size;
-    ary->data = malloc( npy_array_calculate_datasize(ary) );
+    ary->memory = ary->data = malloc( npy_array_calculate_datasize(ary) );
     if (!ary->data) {
         fprintf(stderr, "Cannot allocate memory!\n");
         free(ary);
         return NULL;
     }
     memcpy( ary->data, m->data, npy_array_calculate_datasize(ary) );
+    return ary;
+}
+
+npy_array_t* npy_array_copy( const npy_array_t* m ) {
+    npy_array_t* ary = calloc( 1, sizeof(*ary) );
+    if (!ary) {
+        fprintf(stderr, "Cannot allocate data structure!\n");
+        return NULL;
+    }
+    ary->ndim = MIN( m->ndim, NPY_ARRAY_MAX_DIMENSIONS );
+    memcpy( ary->shape, m->shape, sizeof(ary->shape) );
+    ary->typechar = m->typechar;
+    ary->elem_size = m->elem_size;
+    ary->data = m->data;
     return ary;
 }
