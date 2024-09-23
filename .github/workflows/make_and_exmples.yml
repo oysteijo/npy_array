@@ -33,7 +33,9 @@ jobs:
          ./how_to_save_npz
          ./how_to_load my_4_by_3_array_shortcut.npy
          ./how_to_load_npz iarray_and_darray.npz
-    - name: Test install 
+         ./copying
+         ./copying_read
+    - name: Test install
       run: |
          sudo make install
          unset LD_LIBRARY_PATH

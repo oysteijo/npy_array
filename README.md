@@ -119,12 +119,13 @@ And the linked list structure for `.npz` files:
     } npy_array_list_t;
 
 ## API
-The API is really simple. There is only ~~eleven~~twelve public functions:
+The API is really simple. There is only 13 public functions:
 
     /* These are the four functions for loading and saving .npy files */
     npy_array_t*      npy_array_load        ( const char *filename);
     npy_array_t*      npy_array_mmap        ( const char *filename);
-    npy_array_t*      npy_array_alloc       ( const npy_array_t *m );
+    npy_array_t*      npy_array_deepcopy    ( const npy_array_t *m );
+    npy_array_t*      npy_array_copy        ( const npy_array_t *m );
     void              npy_array_dump        ( const npy_array_t *m );
     void              npy_array_save        ( const char *filename, const npy_array_t *m );
     void              npy_array_free        ( npy_array_t *m );
@@ -167,13 +168,22 @@ compile this with:
 You can the run example_list with a filename (_NumPy_ compressed) as argument.
 
     #include "npy_array_list.h"
+
     int main(int argc, char *argv[])
     {
         if( argc != 2 ) return -1;
+
         double data[] = {0,1,2,3,4,5};
+
         npy_array_list_t* list = NULL;
-        list = npy_array_list_append( list, NPY_ARRAY_ALLOCATOR(data, SHAPE(3,2), NPY_DTYPE_FLOAT64), "matrix" );
-        list = npy_array_list_append( list, NPY_ARRAY_ALLOCATOR(data, SHAPE(2,1,2), NPY_DTYPE_FLOAT64), "tensor" );
+
+        // the first npy_array_t* holds a reference to the data array
+        list = npy_array_list_append( list,
+            NPY_ARRAY_BUILDER_COPY(data, SHAPE(3,2), NPY_DTYPE_FLOAT64), "matrix" );
+        // the second npy_array_t* holds a copy of the data array (hence DEEPCOPY)
+        list = npy_array_list_append( list,
+            NPY_ARRAY_BUILDER_DEEPCOPY(data, SHAPE(2,1,2), NPY_DTYPE_FLOAT64), "tensor" );
+
         npy_array_list_save_compressed( argv[1], list, ZIP_CM_DEFAULT, 0 );
         npy_array_list_free( list );
     }
