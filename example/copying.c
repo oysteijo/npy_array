@@ -1,5 +1,6 @@
 #include "npy_array_list.h"
 
+// the first block must be the same as in copying_read.c
 int main(int argc, char *argv[])
 {
     const char* fname = (argc != 2) ? "copy.npz" : argv[1];
