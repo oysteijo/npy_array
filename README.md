@@ -1,3 +1,4 @@
+![Numpy<->C Logo](/npyarray.png)
 # npy_array
 ## An ANSI C library for handling NumPy arrays
 
